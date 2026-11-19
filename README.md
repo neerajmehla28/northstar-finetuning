@@ -10,6 +10,7 @@ Staging repo for the fine-tuning deliverables (Member 3, Phase 5) for the MMAI 8
   - `MODEL_CARD.md` — what the model is, why xlm-roberta-base was chosen, where the checkpoint lives (not committed — see below), and its known limitation (run-to-run accuracy instability on this small a dataset).
   - `README.md` — how to rerun it, headline result.
   - `results/` — logged CSVs: base-model comparison, learning-rate comparison, 5-run stability check, final 3-way comparison table.
+  - `dealer-chatbot-router-model-tuning.ipynb` — the final Kaggle notebook this work was developed in, run end-to-end with 0 errors. Source of truth for the exact run that produced every number above; `train_router.py` is the same pipeline cleaned up into a standalone script.
 - `config/settings.yaml.snippet` — the team's full `config/settings.yaml` with one line filled in (`models.finetuned_router`); **not** meant to overwrite the real file — apply just that one change when merging (see below).
 - `docs/finetune_tasks.md` — the team's own task tracker for this phase, with rows 2-14 updated to Done.
 
@@ -25,7 +26,7 @@ cd northstar-agent
 git checkout -b finetune-deliverables
 
 # copy the matching files in from this repo
-cp -r ../northstar-finetuning/src/northstar/finetune/* src/northstar/finetune/
+cp -r ../northstar-finetuning/src/northstar/finetune/. src/northstar/finetune/
 cp ../northstar-finetuning/docs/finetune_tasks.md docs/finetune_tasks.md
 
 # apply the one-line settings.yaml change by hand (don't overwrite the file):
