@@ -1,0 +1,4 @@
+model,type_accuracy,macro_f1,escalation_accuracy,escalation_recall,escalation_precision,en_accuracy,fr_accuracy,latency_ms_median,cost_usd_per_chat
+Fine-tuned XLM-R,0.650,0.649870,0.825,0.684211,0.928571,0.653846,0.642857,9.527398,0.000000
+Claude Haiku (small, prompted),0.750,0.735476,0.925,1.000000,0.857000,0.692308,0.857143,2131.600000,0.000364
+Claude Sonnet (large, prompted),0.775,0.771905,0.925,0.944000,0.895000,0.769231,0.785714,958.400000,0.005546

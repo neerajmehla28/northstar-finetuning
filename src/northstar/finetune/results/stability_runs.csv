@@ -1,0 +1,6 @@
+run_id,model,lr,epochs,type_accuracy,macro_f1
+0,xlm-roberta-base,2e-05,30,0.575,0.581
+1,xlm-roberta-base,2e-05,30,0.650,0.612
+2,xlm-roberta-base,2e-05,30,0.675,0.671
+3,xlm-roberta-base,2e-05,30,0.725,0.726
+4,xlm-roberta-base,2e-05,30,0.675,0.667

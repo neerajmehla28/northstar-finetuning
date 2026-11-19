@@ -1,0 +1,5 @@
+model,n_params,type_accuracy,macro_f1,escalation_accuracy,escalation_recall,escalation_precision,en_type_accuracy,fr_type_accuracy,best_epoch
+distilbert-base-multilingual-cased,135198982,0.450,,,,,,,
+Geotrend/distilbert-base-en-fr-cased,68587019,0.250,0.257468,0.800,0.578947,1.000000,0.307692,0.142857,12
+xlm-roberta-base,278052107,0.625,0.623535,0.875,0.736842,1.000000,0.538462,0.785714,24
+microsoft/mdeberta-v3-base,,,,,,,,,

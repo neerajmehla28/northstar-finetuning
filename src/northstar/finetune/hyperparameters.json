@@ -1,0 +1,46 @@
+{
+  "final_model": "xlm-roberta-base",
+  "n_params": 278052107,
+  "architecture": "shared encoder + two linear heads (10-way request type, binary escalation), pooled from the [CLS] token",
+  "batch_size": 16,
+  "learning_rate": 2e-5,
+  "optimizer": "AdamW",
+  "loss": "CrossEntropyLoss (request type) + BCEWithLogitsLoss (escalation), summed",
+  "max_sequence_length": 256,
+  "epochs": 30,
+  "checkpoint_selection": "best validation loss, not final epoch; best epoch varied 18-29 across runs",
+  "seed": 42,
+  "data_split": {
+    "train": 130,
+    "validation": 30,
+    "test": 40,
+    "grouping": "grouped by customer so no customer appears in more than one split",
+    "note": "test split touched exactly once, at the end"
+  },
+  "learning_rate_candidates_tested": [1e-5, 2e-5, 5e-5],
+  "learning_rate_comparison_note": "Results were inconsistent across full reruns of this comparison (see results/learning_rate_comparison.csv and report Step 14/24): 2e-5 was kept as the standard starting point for fine-tuning pretrained transformers, not because one run proved it decisively best.",
+  "base_model_candidates_tested": [
+    "distilbert-base-multilingual-cased",
+    "Geotrend/distilbert-base-en-fr-cased",
+    "xlm-roberta-base",
+    "microsoft/mdeberta-v3-base"
+  ],
+  "base_model_candidates_excluded": {
+    "microsoft/mdeberta-v3-base": "Unrecoverable CUDA out-of-memory error even at batch_size=8, from its disentangled attention mechanism -- an architectural limitation, not a performance result."
+  },
+  "training_cost": {
+    "cash_cost_usd": 0.0,
+    "hardware": "Kaggle free-tier GPU (T4)",
+    "wall_clock_sec_per_30_epoch_run": 206,
+    "equivalent_paid_cloud_cost_usd_per_run": 0.04,
+    "note": "T4 on-demand pricing on major clouds runs USD 0.42-0.53/hr; at that rate one 30-epoch run costs under USD 0.04."
+  },
+  "stability_check": {
+    "description": "Same model/settings retrained 5 times from scratch to measure run-to-run variance from random initialization and batch order, since the training set is only 130 examples.",
+    "runs_type_accuracy": [0.575, 0.650, 0.675, 0.725, 0.675],
+    "mean_type_accuracy": 0.660,
+    "std_type_accuracy": 0.055,
+    "range_type_accuracy": [0.575, 0.725],
+    "see": "results/stability_runs.csv"
+  }
+}

@@ -1,0 +1,4 @@
+lr,type_accuracy,macro_f1,escalation_accuracy,escalation_recall,escalation_precision,en_type_accuracy,fr_type_accuracy,best_epoch,train_time_sec
+1e-05,0.775,0.774,0.875,0.789,0.938,0.731,0.857,29,215.5
+2e-05,0.775,0.772,0.875,0.789,0.938,0.731,0.857,18,223.8
+5e-05,0.575,0.595,0.925,0.895,0.944,0.500,0.714,22,215.1

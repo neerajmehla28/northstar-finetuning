@@ -1,0 +1,70 @@
+# Northstar Motors agent: single place for settings.
+# Code reads this file; nothing below is hard-coded in the logic.
+# Secrets (the OpenRouter key) go in .env, never here.
+
+project:
+  seed: 894                     # same seed = same mock data and same splits
+  contract_version: "1.0.0"
+
+paths:
+  conversations: data/conversations/conversations.csv   # train 130 / validation 30 / test 40
+  redteam: data/redteam/redteam_75.csv                  # guardrail tests only, never trained on
+  redteam_dms_dir: data/redteam                         # dealer records for red-team customers
+  llm_cache: data/llm_cache          # recorded model answers, committed so anyone can replay for free
+  dataset_source: data/source/northstar_synthetic_dataset_v1114.xlsx  # review workbook (source of truth)
+  prompts_dir: prompts                # every prompt lives here, versioned (v1, v2...), never inside the code
+  dms_dir: data/dms
+  runs_dir: outputs/runs
+  results_dir: outputs/results
+
+# Model tiers (OpenRouter ids). Starting choice made 2026-11-10 from price,
+# speed and fit (see docs/decision_log.md, D-07); the validation run confirms
+# or changes it.
+models:
+  small: "anthropic/claude-haiku-5.5"       # $0.10 / $0.50 per 1M tokens in / out
+  large: "anthropic/claude-sonnet-5.5"      # $2 / $10
+  compare_small: "openai/gpt-6-luna"        # $0.10 / $0.50, other vendor, for a controlled router comparison
+  grader: "TO_BE_CHOSEN_IN_PHASE_4"
+  finetuned_router: "xlm-roberta-base (fine-tuned, local checkpoint; see src/northstar/finetune/)"
+
+# Which tier and reasoning effort each component uses (the starting
+# hypothesis; evaluation results confirm or change it).
+components:
+  router:            {tier: small, reasoning_effort: low, max_tokens: 1500, prompt: router/v3.md}   # v2 chosen 2026-11-10 from 4 validation runs; v3 adds the dispute rule (D-13)
+  booking_status:    {tier: small, reasoning_effort: low, max_tokens: 2000, prompt: booking_status/v1.md}
+  warranty_recall:   {tier: large, reasoning_effort: high, max_tokens: 4000, prompt: warranty_recall/v1.md}
+  billing_lease:     {tier: large, reasoning_effort: medium, max_tokens: 3000, prompt: billing_lease/v2.md}
+  single_agent:      {tier: large, reasoning_effort: medium, max_tokens: 4000, prompt: single_agent/v1.md}   # baseline (task 11)
+
+agent:
+  architecture: multi_agent     # multi_agent | single_agent (baseline)
+  prompt_version: v1
+  max_tool_calls_per_turn: 6
+  shared_rules: shared/policy_core_v2.md   # rules P-01 to P-10 included in every specialist prompt
+  router_confidence_floor: 0.55 # below this, ask a clarifying question or escalate
+
+# Input and output checks (Phase 3). Rules in docs/guardrails.md, code in src/northstar/guardrails/.
+guardrails:
+  enabled: true
+  max_message_chars: 2000       # longer customer messages are cut (G-IN-03)
+
+# Mock dealer system (DMS) behaviour. Failure injection lets us test the
+# "DMS is down" edge case on purpose instead of hoping it happens.
+dms:
+  simulated_latency_ms: [40, 250]
+  failure_rate: 0.0             # set to e.g. 0.1 for failure-handling tests
+  timeout_ms: 3000
+  n_decoy_customers: 25         # extra customers never in chats (PII-leak tests)
+  # Every branch a customer mentions in the chats, so the agent never denies a real branch.
+  locations: ["Oakville", "Mississauga", "Ottawa", "Scarborough", "Vaughan", "Brampton",
+              "Etobicoke", "Markham", "Burlington", "Richmond Hill", "Ajax"]
+  slot_days_ahead: 14
+  anchor_date: "2026-11-16"  # fixed 'today' for the mock system, so runs are reproducible
+
+llm_client:
+  mode: auto                    # auto = live if OPENROUTER_API_KEY is set, else replay
+  base_url: https://openrouter.ai/api/v1
+  timeout_s: 30
+  max_retries: 2
+  budget_usd: 25.0              # hard stop for a whole run
+  use_response_format: false    # JSON is asked for in the prompt and checked by the contracts; not every provider accepts response_format
