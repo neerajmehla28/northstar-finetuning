@@ -68,9 +68,12 @@ def epoch_curves(oof: dict, pool: pd.DataFrame) -> pd.DataFrame:
         for e in range(arr["type"].shape[0]):
             t = type_scores(y_type, arr["type"][e])
             s = escalation_scores(y_esc, arr["escalation"][e])
-            rows.append(dict(seed=seed, epoch=e + 1, type_accuracy=t["accuracy"], type_macro_f1=t["macro_f1"],
-                             esc_recall=s["recall"], esc_precision=s["precision"], esc_f2=s["f2"],
-                             esc_accuracy=s["accuracy"]))
+            row = dict(seed=seed, epoch=e + 1, type_accuracy=t["accuracy"], type_macro_f1=t["macro_f1"],
+                       esc_recall=s["recall"], esc_precision=s["precision"], esc_f2=s["f2"],
+                       esc_accuracy=s["accuracy"])
+            if "language" in arr:       # only for runs that also had a language head
+                row["language_accuracy"] = float((arr["language"][e].argmax(-1) == pool["language_label"].values).mean())
+            rows.append(row)
     return pd.DataFrame(rows)
 
 
@@ -89,9 +92,12 @@ def summary_at_epoch(oof: dict, pool: pd.DataFrame, epoch: int, threshold: float
     for seed, arr in oof.items():
         t = type_scores(y_type, arr["type"][epoch - 1])
         s = escalation_scores(y_esc, arr["escalation"][epoch - 1], threshold)
-        per_seed.append(dict(seed=seed, type_accuracy=t["accuracy"], type_macro_f1=t["macro_f1"],
-                             esc_recall=s["recall"], esc_precision=s["precision"], esc_f2=s["f2"],
-                             esc_accuracy=s["accuracy"], esc_missed=s["missed"], esc_false_alarms=s["false_alarms"]))
+        row = dict(seed=seed, type_accuracy=t["accuracy"], type_macro_f1=t["macro_f1"],
+                   esc_recall=s["recall"], esc_precision=s["precision"], esc_f2=s["f2"],
+                   esc_accuracy=s["accuracy"], esc_missed=s["missed"], esc_false_alarms=s["false_alarms"])
+        if "language" in arr:
+            row["language_accuracy"] = float((arr["language"][epoch - 1].argmax(-1) == pool["language_label"].values).mean())
+        per_seed.append(row)
     per_seed = pd.DataFrame(per_seed)
     avg_type = np.mean([a["type"][epoch - 1] for a in oof.values()], axis=0)       # average the scores of all seeds
     avg_esc = np.mean([a["escalation"][epoch - 1] for a in oof.values()], axis=0)

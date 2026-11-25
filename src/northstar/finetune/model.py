@@ -23,15 +23,22 @@ HEAD_SIZES = {"type": 10, "escalation": 1, "language": 2, "reason": 7}
 
 
 class RouterModel(nn.Module):
-    def __init__(self, model_name: str, heads: dict, dropout: float = 0.2, encoder=None):
+    def __init__(self, model_name: str, heads: dict, dropout: float = 0.2, encoder=None, lora: dict | None = None):
         """heads: which questions to answer, e.g. {"type": 10, "escalation": 1}.
-        encoder: pass a ready-made encoder (used only by tests); normally it is downloaded."""
+        encoder: pass a ready-made encoder (used only by tests); normally it is downloaded.
+        lora: None for ordinary fine-tuning (every weight is adjusted). Or the LoRA settings, e.g.
+              {"r": 8, "lora_alpha": 16, "target_modules": ["query", "value"]}: the pretrained weights are
+              frozen and only small add-on matrices inside the attention layers (plus the heads) are trained,
+              about 1% as many numbers, which is cheaper and may be steadier on a small dataset."""
         super().__init__()
         if encoder is None:
             from transformers import AutoModel
             encoder = AutoModel.from_pretrained(model_name)      # pretrained weights, downloaded the first time
+        hidden = encoder.config.hidden_size                      # size of the digest vector (768 for XLM-R base)
+        if lora:
+            from peft import LoraConfig, get_peft_model
+            encoder = get_peft_model(encoder, LoraConfig(**lora))    # freezes the encoder, adds the small trainable add-ons
         self.encoder = encoder
-        hidden = self.encoder.config.hidden_size                 # size of the digest vector (768 for XLM-R base)
         self.dropout = nn.Dropout(dropout)                       # randomly blanks 20% of the digest while training,
                                                                  # so no head can lean on one single number
         # One linear layer per question: digest (hidden numbers) -> that question's scores.

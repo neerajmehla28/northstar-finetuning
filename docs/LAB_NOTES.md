@@ -35,6 +35,35 @@ Entry format: **date, step** | what we did | what came out | decision | next.
 - **Expected cost:** the original notebook took about 215 s per 30-epoch run on Kaggle; 3 inputs x 3 seeds x 5 folds = 45 runs, so the unoptimised cost would be about 2.7 hours. Per-batch padding and half precision should cut that substantially; the smoke test will measure it.
 - **Next:** push, run on Kaggle with the GPU on, bring back `results_02.zip`.
 
+## 2026-11-25, Step 2 result: cross-validated baseline and input comparison
+- **What:** ran `notebooks/02_cv_baseline_and_inputs.ipynb` on a Kaggle T4 (commit `313227b`): original recipe, 3 inputs x 3 seeds x 5 folds = 45 runs, about 45 minutes (52 s, 58 s and 71 s per run for first message, customer turns and full conversation). Raw scores are in `results/cv_old_recipe/` (the 45 runs plus a config file per input); tables and figures are in `results/step02/`.
+- **Came out (160 out-of-fold chats, epoch 29, mean over 3 seeds; see `results/step02/cv_summary.csv`):**
+  - Type accuracy: first message 0.72, customer turns 0.70, full conversation 0.75. Averaging the 3 seeds gives 0.76, 0.74 and 0.78, so a seed ensemble is worth 3 to 5 points.
+  - 95% intervals (resampling customers) are about 0.69 to 0.82, 0.68 to 0.81 and 0.70 to 0.85; every pairwise exact McNemar test has p above 0.45. **No input is measurably better than another.**
+  - Seed-to-seed spread of the pooled score is only 1 to 3 points (the original notebook's 5.5-point spread was on 40 chats).
+  - Escalation at the default threshold: recall about 0.75 (about 17 of the 69 chats that need a person missed), precision about 0.86, F2 about 0.77.
+  - First-message input, per request type: best roadside (0.94), worst needs_human (0.56), repair_status and out_of_scope (0.69). English 0.82 vs French 0.64 (104 vs 56 chats).
+- **Learning curves:** held-out macro-F1 is near zero for the first 5 epochs, climbs from epoch 7 to 17, then plateaus from about epoch 18 to 30. Held-out loss flattens near epoch 18 and does not rise; training loss keeps falling to about 0.1.
+- **Decisions:**
+  - Primary input by the pre-written rule: **first message** (it is 0.028 macro-F1 behind the best input, inside the 0.036 seed-to-seed spread). So the production-realistic input costs no measurable accuracy.
+  - E* = 29 by the rule, but the plateau starts near epoch 18, so the exact choice inside 18 to 30 is noise. Keep 30 for the original recipe.
+- **Reading and limits:** the first 15 epochs are largely spent getting started (constant learning rate 2e-5, no warmup, only 8 steps per epoch), which points to a recipe change (warmup and decay, higher learning rate) as a cheap speed-up and possibly a gain. The escalation recall and the French gap are the visible weaknesses. All differences between inputs are inside the noise at 160 chats.
+- **Next:** one Kaggle notebook on the first-message input that tests (a) a language head, (b) a warmup-and-decay recipe, and (c) the escalation threshold chosen on out-of-fold scores; then gold labels for the escalation reasons.
+
+## 2026-11-25, Track C: draft reason labels
+- **What:** gave all 200 chats an escalation reason in a separate file, `data/labels/escalation_reasons.csv` (the dataset itself is untouched). Rules derived 169 rows: 113 none, 40 adversarial, 16 safety (roadside), 13 policy_limit (contested charge). I read the remaining 18 escalating chats by hand (16 needs_human, 2 warranty_claim) and drafted a reason, a confidence and a note for each.
+- **Came out:** overall counts none 113, adversarial 40, safety 25, policy_limit 14, legal_threat 3, customer_request 3, bereavement 2. Half the drafted rows (9 of 18) are medium confidence, with the alternative named in the note. Rare reasons have 2 to 3 chats each, and the 40 test chats hold only 1 bereavement, 1 customer_request and no legal_threat.
+- **Status:** draft, waiting for Neeraj's approval of the 18 drafted rows. Definitions follow the team's router prompt v3.
+- **Decision (same day):** Neeraj parked this. The dataset has no reason column, so labels written afterwards would be invented ground truth; the tuned model is not trained or scored on reasons for now. The file stays as a parked draft (`data/labels/README.md` says so) and is not committed. Reason handling returns later via the data owner or a language-model fallback.
+- **Next:** notebook 03 adds the language head and LoRA only.
+
+## 2026-11-25, Step 3 build: language head and LoRA (not yet run)
+- **What:** added LoRA to `model.py` (freeze the pretrained weights, train small add-on matrices on the attention query and value layers, rank 8, alpha 16) and `train_cv.py` (config switch, optimiser over trainable weights only, trainable-parameter count and run time saved per run); `cv_analysis.py` now scores a language head; wrote `notebooks/03_language_head_and_lora.ipynb`.
+- **Models compared on the same folds, first-message input, 3 seeds:** the notebook-02 baseline (read from `results/cv_old_recipe`), the same model plus a language head, and LoRA with the language head at learning rates 1e-4 and 3e-4 (LoRA normally needs a bigger step than full fine-tuning, so two values are tried).
+- **Checked here:** all code parses; the analysis cells ran end to end on synthetic runs (plumbing only). LoRA and the language head have not been run on real data; the notebook starts with a smoke test of all three models.
+- **Dependency:** the notebook needs `results/cv_old_recipe` and the new code on GitHub, so push first.
+- **Housekeeping:** `data/labels/` (the parked draft reason labels) is in `.gitignore` so it cannot be committed by accident.
+
 ## 2026-11-25, Kaggle setup lessons
 - **What happened:** the first Kaggle run failed with `cannot import name 'protocol'`. Two causes: (1) the new files had not been pushed to GitHub yet, and (2) after the push, Kaggle still held the old clone from the first run, because the notebook only cloned when the folder did not exist.
 - **Also found:** on Windows, git rewrote the dataset's line endings when staging it, which would have broken the SHA-256 check on Kaggle's Linux machine. `.gitattributes` now keeps `conversations.csv` byte-for-byte.

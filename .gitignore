@@ -10,5 +10,8 @@ __pycache__/
 models/
 outputs/
 
+# Parked draft labels: not data, not for sharing without the data owner's sign-off
+data/labels/
+
 # Secrets
 .env

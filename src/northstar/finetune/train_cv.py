@@ -51,6 +51,10 @@ class TrainConfig:
     grad_clip: float = 0.0            # 0 = no clipping (the notebook); otherwise cap the size of each update
     fp16: bool = True                 # half-precision maths on a GPU: faster, same results within noise
     heads: tuple = ("type", "escalation")
+    lora: bool = False                # True = LoRA: freeze the pretrained weights, train small add-on matrices
+    lora_r: int = 8                   # size of the add-on matrices (rank); bigger = more flexible
+    lora_alpha: int = 16              # strength of the add-on's effect
+    lora_dropout: float = 0.1
 
 
 def set_seed(seed: int) -> None:
@@ -126,8 +130,12 @@ def run_one(cfg: TrainConfig, token_ids, labels, train_idx, val_idx, seed, pad_i
     use_amp = bool(cfg.fp16 and device.type == "cuda")
     set_seed(seed)
     encoder = encoder_factory() if encoder_factory else None
-    model = RouterModel(cfg.model_name, {h: HEAD_SIZES[h] for h in cfg.heads}, cfg.dropout, encoder).to(device)
-    opt = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+    lora = (dict(r=cfg.lora_r, lora_alpha=cfg.lora_alpha, lora_dropout=cfg.lora_dropout, bias="none",
+                 target_modules=["query", "value"]) if cfg.lora else None)     # add-ons on the attention "query" and "value" layers
+    model = RouterModel(cfg.model_name, {h: HEAD_SIZES[h] for h in cfg.heads}, cfg.dropout, encoder, lora).to(device)
+    trainable = [p for p in model.parameters() if p.requires_grad]            # frozen weights are left out of the optimiser
+    n_trainable, n_total = sum(p.numel() for p in trainable), sum(p.numel() for p in model.parameters())
+    opt = torch.optim.AdamW(trainable, lr=cfg.lr, weight_decay=cfg.weight_decay)
     steps_per_epoch = math.ceil(len(train_idx) / cfg.batch_size)
     scheduler = _make_scheduler(opt, cfg, epochs * steps_per_epoch)
     scaler = torch.amp.GradScaler("cuda", enabled=use_amp)     # keeps tiny half-precision gradients from vanishing
@@ -160,7 +168,9 @@ def run_one(cfg: TrainConfig, token_ids, labels, train_idx, val_idx, seed, pad_i
     gc.collect()
     if device.type == "cuda":
         torch.cuda.empty_cache()
-    return {k: np.array(v, dtype=np.float32) for k, v in hist.items()}
+    out = {k: np.array(v, dtype=np.float32) for k, v in hist.items()}
+    out["n_trainable"], out["n_total"] = np.array(n_trainable), np.array(n_total)    # how many numbers were trained
+    return out
 
 
 def _git_commit() -> str:
@@ -209,6 +219,7 @@ def run_cv(cfg: TrainConfig, variant: str, out_dir, rep: int = 0, seeds=P.CV_SEE
             train_idx = np.where(fold_arr != k)[0]
             t0 = time.time()
             hist = run_one(cfg, token_ids, labels, train_idx, val_idx, seed, pad_id, device, epochs, encoder_factory)
+            hist["seconds"] = np.array(time.time() - t0)                       # how long this run took
             np.savez_compressed(path, ids=pool["id"].values[val_idx].astype(str), fold=k, seed=seed, **hist)
             saved.append(path)
             if verbose:

@@ -29,7 +29,7 @@ The code that enforces these rules is `src/northstar/finetune/protocol.py` (labe
 |---|---|---|
 | Request type | 10 labels, same order as `contracts.py` | |
 | Escalation | yes / no | |
-| Reason | none, safety, bereavement, legal_threat, adversarial, customer_request, policy_limit | The router's seven; verification_failed, tool_failure and low_confidence are set by the pipeline. Gold labels do not exist yet (action plan F13). Reason metrics start when they do. |
+| Reason | none, safety, bereavement, legal_threat, adversarial, customer_request, policy_limit | **Not trained and not scored for now** (decision 2026-11-25): the dataset has no reason labels and labels written afterwards would be invented ground truth. Handled later, with the data owner's sign-off, or by a language-model fallback. Prompted baselines may output a reason; it is reported as an extra but not scored. |
 | Language | en / fr | |
 
 Consistency rule: escalation is yes if and only if the reason is not "none". Enforced in code for every router, so a router cannot say "escalate" with reason "none".
