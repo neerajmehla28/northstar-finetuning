@@ -52,6 +52,12 @@ Every router is compared on all three, on the same chats:
 - Final training seeds: 101, 102, 103, 104, 105.
 - Every training run sets the seed for Python, NumPy, PyTorch and the data-loader shuffle.
 
+### Epoch count and training recipe (added with notebook 02)
+
+- Step 2 reproduces the original recipe: XLM-RoBERTa base, learning rate 2e-5, batch 16, constant learning rate, no warmup, no gradient clipping, up to 30 epochs. Chats are padded per batch and the arithmetic runs in half precision (faster; no change expected beyond noise). Chats are cut at 320 tokens, which no chat reaches.
+- Every run scores its held-out fold after every epoch. **One** epoch count (E*) is then chosen for all runs: the best point of the mean held-out macro-F1 curve over variants and seeds, smoothed over three neighbouring epochs. This is chosen on the same folds it is scored on, so cross-validation scores are very slightly optimistic; the test chats are untouched.
+- Recipe changes (warmup and decay, clipping, LoRA) are separate experiments in step 6, compared on the same folds and seeds.
+
 ## 6. Metrics
 
 | Output | Primary | Also reported |
