@@ -90,10 +90,10 @@ Every router is compared on all three, on the same chats:
 Applies to Haiku, Sonnet, any other LLM and Jev.
 
 - Same chats, same input variant, same label lists, same pool-only tuning budget. The number of prompt or schema iterations tried is recorded for every baseline, including the fine-tuned model's configurations.
-- Two schemas: a narrow-task schema (type, escalation, language, reason) for the head-to-head, and the team's full schema for the integration test. Cost and latency are measured under the narrow schema for the narrow-task comparison.
+- Schema (changed 2026-11-25, before any baseline was run): Haiku and Sonnet get the team's router prompt v3 unchanged (`prompts/router_v3.md`), so they are measured exactly as the team's system runs them. Its JSON also carries a reason and secondary types; those are saved, not scored. Every router is scored on the same three answers: type, escalation, language. No separate narrow-schema prompt is written: it would be a new, untuned prompt, and the reason is parked. Jev gets typed questions built from the same prompt wording (one version, not tuned).
 - At least three repeated runs per baseline to measure run-to-run variation; model name, version, temperature and reasoning effort are recorded. Raw outputs are cached per chat.
 - The team's prompts were tuned on the 30 validation chats, which are part of the pool, so baseline scores on the pool are optimistic. The clean comparison is on the test chats and later on the fresh held-out set.
-- Latency: batch size 1, fixed hardware stated in the report (CPU for the fine-tuned model; the API round trip for LLMs), warm-up call excluded, median and p90 over all chats.
+- Latency: batch size 1, fixed hardware stated in the report (CPU for the fine-tuned model; the API round trip for LLMs), warm-up call excluded, median and p90. For the API models on the pool: the first 40 pool chats, one call at a time (the accuracy runs send six calls at once to save time, which can slow each call).
 - Cost: measured tokens at the provider's listed prices on the run date; fine-tuned cost includes the server assumptions stated in the economics scenarios.
 
 ## 10. Cascade and system tests
@@ -120,3 +120,4 @@ Applies to Haiku, Sonnet, any other LLM and Jev.
 
 - 2026-11-25: draft v1 written.
 - 2026-11-25: fold method changed from random stratified-group draws to a balancing search (first draw was too lopsided on language). Folds are produced on Kaggle and committed.
+- 2026-11-25: section 9, before any baseline run: one schema (the team's prompt unchanged, three answers scored) instead of two; API latency from 40 sequential calls.

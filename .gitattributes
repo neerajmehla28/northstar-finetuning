@@ -1,3 +1,6 @@
 # Keep the dataset byte-for-byte identical on every machine: its SHA-256 is checked on every load,
 # and Windows git would otherwise rewrite its line endings.
 data/conversations/conversations.csv -text
+
+# The team router prompt is used verbatim for the prompted baselines (it is part of every recorded call).
+prompts/router_v3.md -text
