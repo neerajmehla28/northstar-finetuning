@@ -7,7 +7,8 @@ How it works, in plain words
    are built, that position summarises the whole message, like a one-line digest of the chat.
 3. Each "head" is one small linear layer that turns that digest into the answers for one question.
    The type head gives 10 scores (one per request type); the escalation head gives 1 score
-   (positive means "a person should take over"); a language head gives 2; a reason head gives 7.
+   (positive means "a person should take over"); a language head gives 2; a reason head gives 7; an attack
+   head gives 1 (positive means "this chat tries to trick the assistant").
 4. Training adjusts the encoder and the heads together, so the digest becomes useful for every question.
 
 The original notebook had exactly this shape with two heads (type and escalation); this file makes the
@@ -19,7 +20,8 @@ import torch
 import torch.nn as nn
 
 # How many output numbers each question needs.
-HEAD_SIZES = {"type": 10, "escalation": 1, "language": 2, "reason": 7}
+HEAD_SIZES = {"type": 10, "escalation": 1, "language": 2, "reason": 7, "attack": 1}
+BINARY_HEADS = ("escalation", "attack")   # yes/no questions: one score each, positive means "yes"
 
 
 class RouterModel(nn.Module):
@@ -29,7 +31,7 @@ class RouterModel(nn.Module):
         lora: None for ordinary fine-tuning (every weight is adjusted). Or the LoRA settings, e.g.
               {"r": 8, "lora_alpha": 16, "target_modules": ["query", "value"]}: the pretrained weights are
               frozen and only small add-on matrices inside the attention layers (plus the heads) are trained,
-              about 1% as many numbers, which is cheaper and may be steadier on a small dataset."""
+              about 0.1% as many numbers, which is cheaper and may be steadier on a small dataset."""
         super().__init__()
         if encoder is None:
             from transformers import AutoModel
@@ -50,6 +52,7 @@ class RouterModel(nn.Module):
         out = self.encoder(input_ids=input_ids, attention_mask=attention_mask)
         digest = self.dropout(out.last_hidden_state[:, 0, :])    # first position = summary of the whole chat
         scores = {key.removeprefix("head_"): head(digest) for key, head in self.heads.items()}   # back to plain names
-        if "escalation" in scores:
-            scores["escalation"] = scores["escalation"].squeeze(-1)   # one number per chat, not a 1-long list
+        for name in BINARY_HEADS:
+            if name in scores:
+                scores[name] = scores[name].squeeze(-1)   # one number per chat, not a 1-long list
         return scores

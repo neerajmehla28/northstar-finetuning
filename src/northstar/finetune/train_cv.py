@@ -29,11 +29,11 @@ import torch
 import torch.nn.functional as F
 
 from northstar.finetune import protocol as P
-from northstar.finetune.model import HEAD_SIZES, RouterModel
+from northstar.finetune.model import BINARY_HEADS, HEAD_SIZES, RouterModel
 
 # Which column of the dataset holds the correct answer for each question.
 HEAD_LABEL_COLUMN = {"type": "type_label", "escalation": "escalation_label",
-                     "language": "language_label", "reason": "reason_label"}
+                     "language": "language_label", "reason": "reason_label", "attack": "attack_label"}
 
 
 @dataclass
@@ -82,12 +82,12 @@ def _batches(order, token_ids, pad_id, device, batch_size):
 
 def _total_loss(scores: dict, labels: dict, chunk: np.ndarray) -> torch.Tensor:
     """Sum of one loss per question, as in the notebook: cross-entropy for the pick-one questions,
-    binary cross-entropy for the yes/no escalation question."""
+    binary cross-entropy for the yes/no questions (escalation, attack)."""
     idx = torch.as_tensor(chunk, device=next(iter(labels.values())).device)
     loss = 0.0
     for name, s in scores.items():
         y = labels[name][idx]
-        if name == "escalation":
+        if name in BINARY_HEADS:
             loss = loss + F.binary_cross_entropy_with_logits(s.float(), y)
         else:
             loss = loss + F.cross_entropy(s.float(), y)
@@ -196,7 +196,7 @@ def run_cv(cfg: TrainConfig, variant: str, out_dir, rep: int = 0, seeds=P.CV_SEE
 
     token_ids = tokenizer(list(P.input_text(pool, variant)), truncation=True, max_length=cfg.max_length)["input_ids"]
     labels = {h: torch.tensor(pool[HEAD_LABEL_COLUMN[h]].values,
-                              dtype=torch.float32 if h == "escalation" else torch.long).to(device)
+                              dtype=torch.float32 if h in BINARY_HEADS else torch.long).to(device)
               for h in cfg.heads}
 
     out = Path(out_dir) / variant

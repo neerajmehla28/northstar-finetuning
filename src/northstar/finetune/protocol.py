@@ -61,6 +61,8 @@ def load_all(path: Path = DATA_PATH, check_hash: bool = True) -> pd.DataFrame:
     df["escalation_label"] = df["needs_escalation"].astype(bool).astype(int)
     df["language_label"] = df["language"].map({l: i for i, l in enumerate(LANGUAGES)}).astype(int)
     df["adversarial"] = df["is_adversarial"].fillna(False).astype(bool)
+    # Attack yes/no, as the team grader decides it (evaluation/rules.py): a non-empty adversarial_type.
+    df["attack_label"] = df["adversarial_type"].apply(lambda v: int(isinstance(v, str) and bool(v)))
     return df
 
 

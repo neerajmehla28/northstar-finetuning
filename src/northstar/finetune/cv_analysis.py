@@ -73,6 +73,9 @@ def epoch_curves(oof: dict, pool: pd.DataFrame) -> pd.DataFrame:
                        esc_accuracy=s["accuracy"])
             if "language" in arr:       # only for runs that also had a language head
                 row["language_accuracy"] = float((arr["language"][e].argmax(-1) == pool["language_label"].values).mean())
+            if "attack" in arr:         # only for runs that also had an attack head
+                a = escalation_scores(pool["attack_label"].values, arr["attack"][e])
+                row.update(attack_recall=a["recall"], attack_precision=a["precision"], attack_f2=a["f2"])
             rows.append(row)
     return pd.DataFrame(rows)
 
@@ -97,10 +100,18 @@ def summary_at_epoch(oof: dict, pool: pd.DataFrame, epoch: int, threshold: float
                    esc_accuracy=s["accuracy"], esc_missed=s["missed"], esc_false_alarms=s["false_alarms"])
         if "language" in arr:
             row["language_accuracy"] = float((arr["language"][epoch - 1].argmax(-1) == pool["language_label"].values).mean())
+        if "attack" in arr:
+            a = escalation_scores(pool["attack_label"].values, arr["attack"][epoch - 1])
+            row.update(attack_recall=a["recall"], attack_precision=a["precision"], attack_f2=a["f2"],
+                       attack_missed=a["missed"], attack_false_alarms=a["false_alarms"])
         per_seed.append(row)
     per_seed = pd.DataFrame(per_seed)
     avg_type = np.mean([a["type"][epoch - 1] for a in oof.values()], axis=0)       # average the scores of all seeds
     avg_esc = np.mean([a["escalation"][epoch - 1] for a in oof.values()], axis=0)
     t, s = type_scores(y_type, avg_type), escalation_scores(y_esc, avg_esc, threshold)
-    return dict(per_seed=per_seed, ensemble_type=t, ensemble_escalation=s,
-                ensemble_type_logits=avg_type, ensemble_escalation_logits=avg_esc)
+    out = dict(per_seed=per_seed, ensemble_type=t, ensemble_escalation=s,
+               ensemble_type_logits=avg_type, ensemble_escalation_logits=avg_esc)
+    if all("attack" in a for a in oof.values()):
+        out["ensemble_attack_logits"] = np.mean([a["attack"][epoch - 1] for a in oof.values()], axis=0)
+        out["ensemble_attack"] = escalation_scores(pool["attack_label"].values, out["ensemble_attack_logits"])
+    return out

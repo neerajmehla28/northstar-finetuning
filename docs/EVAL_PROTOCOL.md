@@ -29,8 +29,9 @@ The code that enforces these rules is `src/northstar/finetune/protocol.py` (labe
 |---|---|---|
 | Request type | 10 labels, same order as `contracts.py` | |
 | Escalation | yes / no | |
-| Reason | none, safety, bereavement, legal_threat, adversarial, customer_request, policy_limit | **Not trained and not scored for now** (decision 2026-11-25): the dataset has no reason labels and labels written afterwards would be invented ground truth. Handled later, with the data owner's sign-off, or by a language-model fallback. Prompted baselines may output a reason; it is reported as an extra but not scored. |
-| Language | en / fr | |
+| Reason | none, safety, bereavement, legal_threat, adversarial, customer_request, policy_limit | **Not trained as a seven-way answer** (decision 2026-11-25): the dataset has no reason column, and labels written afterwards would be invented. **Scored by where it sends the chat** (updated 2026-11-26): the team's grader decides the acceptable team from two dataset columns, `request_type` and `adversarial_type` (`evaluation/rules.py`, copied in `routing.py`), so the right-team rate is measured with real labels for every router. A tuned router gets its reason from type + attack (a fixed rule) or from a language-model step. |
+| Attack | yes / no | Added 2026-11-26. A real label: `adversarial_type` is non-empty (40 chats, all need a person), the same definition the team's grader uses. Read from the chat text only; the column is the answer learned, never an input. |
+| Language | en / fr | By the word rule (`routing.language_rule`, decision 2026-11-26): as accurate as a language head and cannot affect the other answers. |
 
 Consistency rule: escalation is yes if and only if the reason is not "none". Enforced in code for every router, so a router cannot say "escalate" with reason "none".
 
@@ -64,7 +65,8 @@ Every router is compared on all three, on the same chats:
 |---|---|---|
 | Type | macro-F1 | accuracy, per-class recall, confusion pairs, English vs French |
 | Escalation | F2 (recall counts twice as much as precision) | recall, precision, accuracy, missed escalations (count) |
-| Reason | macro-F1 over the seven reasons | queue-correct rate (does the handoff reach the right queue) |
+| Reason | right-team rate: chats needing a person that reach a team the grader accepts, out of all chats needing a person (a missed handoff counts as wrong) | attacks sent to the right team; wrong-team count; extra handoffs |
+| Attack | F2 | recall, precision |
 | Language | accuracy | |
 | Confidence | expected calibration error (10 equal-width bins) | Brier score, reliability table |
 | System | cost per chat, median and p90 latency | parameters, memory |
@@ -121,3 +123,4 @@ Applies to Haiku, Sonnet, any other LLM and Jev.
 - 2026-11-25: draft v1 written.
 - 2026-11-25: fold method changed from random stratified-group draws to a balancing search (first draw was too lopsided on language). Folds are produced on Kaggle and committed.
 - 2026-11-25: section 9, before any baseline run: one schema (the team's prompt unchanged, three answers scored) instead of two; API latency from 40 sequential calls.
+- 2026-11-26, after the team's end-to-end result (its fine-tuned router lost on handoff teams) and before any of our routers was scored this way: the reason is scored by the right-team rate with the grader's own rule; an attack yes/no output is added (real label); language comes from the word rule. Router options compared on the pool: tuned alone (type rule or attack answer), tuned + language-model reason step, plus cascade, and language model alone.

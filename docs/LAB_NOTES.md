@@ -105,3 +105,61 @@ Entry format: **date, step** | what we did | what came out | decision | next.
 - **What:** `notebooks/03b_lora_longer.ipynb`: LoRA at 3e-4 and at 1e-3, 60 epochs each, type and escalation heads only (the same heads as the baseline, so only LoRA differs; notebook 03's LoRA also carried the language head). Same folds, input, seeds and LoRA size. The 60-epoch runs are also read at epoch 30. Compared with the baseline and notebook 03's 30-epoch LoRA run, read from the repo. About 30 to 35 minutes on a T4.
 - **Checked here (no training):** the analysis cells ran on fake 60-epoch runs made by repeating notebook 03's saved LoRA runs; the baseline and LoRA rows reproduce notebook 03 exactly.
 - **Bias, stated up front:** trying more LoRA settings and keeping the best, on the folds it is scored on, favours LoRA slightly.
+
+## 2026-11-26, Step 4 result: comparison models on the pool
+- **What:** ran `notebooks/04_baselines_haiku_sonnet_jev.ipynb` on a Kaggle CPU session (commit `a06357b`; run config in `results/step04/run_config.json`). 16 runs x 160 pool chats (Haiku and Sonnet 3 repeats, Jev 2, two inputs each) plus 40 one-at-a-time speed calls per model. Every answer is in `results/step04/preds/`, every raw reply in `results/step04/cache/` (2,680 files; the notebook replays from them for free), tables and figure in `results/step04/`.
+- **Run notes:** the first attempt stopped on Sonnet's full-conversation runs with HTTP 402 "in-flight budget exhausted": the API key had its own $8 cap with $3.83 left, and OpenRouter holds money back for calls in progress. Neeraj raised the cap; the rerun with 3 parallel calls reused every saved answer. 0 unusable answers, 0 correction calls, 0 errors in all 2,560 scored answers. Recorded cost of the scored runs $5.70 (Sonnet $5.31). Jev's reply matched the documented shape (an answer and probabilities per question; the yes/no answer has no confidence field); its two repeats agree on 98% of request types.
+- **Came out (160 pool chats; mean ± sd over runs, "combined" = average of runs; `comparison_pool.csv`):**
+
+  | Method | Input | Type accuracy | Escalation recall | Escalation precision | Combined type acc [95% CI] | $ per chat |
+  |---|---|---|---|---|---|---|
+  | tuned XLM-R (notebook 02, epoch 30) | first message | 0.719 ± 0.050 | 0.720 ± 0.022 | 0.863 ± 0.046 | 0.756 [0.68, 0.83] | ~0 |
+  | Haiku 5.5 | first message | 0.875 ± 0.006 | 0.961 ± 0.008 | 0.901 ± 0.015 | 0.875 [0.83, 0.92] | 0.000328 |
+  | Sonnet 5.5 | first message | 0.917 ± 0.004 | 0.971 ± 0.000 | 0.971 ± 0.000 | 0.919 [0.88, 0.96] | 0.005375 |
+  | Jev 1.14 | first message | 0.853 ± 0.004 | 0.986 ± 0.000 | 0.850 ± 0.000 | 0.856 [0.81, 0.90] | 0.000074 |
+  | tuned XLM-R | full conversation | 0.750 ± 0.006 | 0.783 ± 0.043 | 0.875 ± 0.014 | 0.775 [0.70, 0.85] | ~0 |
+  | Haiku 5.5 | full conversation | 0.800 ± 0.013 | 0.986 ± 0.000 | 0.861 ± 0.011 | 0.800 [0.74, 0.86] | 0.000372 |
+  | Sonnet 5.5 | full conversation | 0.838 ± 0.006 | 0.981 ± 0.008 | 0.923 ± 0.007 | 0.838 [0.77, 0.89] | 0.005689 |
+  | Jev 1.14 | full conversation | 0.800 ± 0.000 | 0.928 ± 0.000 | 0.901 ± 0.000 | 0.806 [0.75, 0.86] | 0.000078 |
+
+  Language accuracy 1.000 for all three API models on both inputs.
+- **Paired tests against the tuned model** (combined answers; `paired_tests_pool.csv`): first message: Haiku right on 29 chats the tuned model missed vs 10 the other way (p = 0.003), Sonnet 33 vs 7 (p < 0.001), Jev 26 vs 10 (p = 0.011). Full conversation: Haiku 25 vs 21 (p = 0.66), Sonnet 27 vs 17 (p = 0.17), Jev 20 vs 15 (p = 0.50).
+- **Speed, one call at a time from Kaggle** (`latency.csv`, 39 calls after a warm-up): Jev median 200 ms (p90 222), Sonnet 1,004 ms (p90 2,035), Haiku 2,340 ms (p90 2,822).
+- **Where each wins** (`type_recall_by_method.csv`, `type_accuracy_by_language.csv`, first message): French type accuracy tuned 0.64 vs Haiku 0.84, Jev 0.77, Sonnet 0.91 (English 0.82 vs 0.89, 0.90, 0.92). needs_human: tuned 0.56, Haiku 0.56, Sonnet 0.88, Jev 1.00. The tuned model beats all three API models only on roadside_assistance (0.88 vs 0.75 to 0.81); it ties or beats Jev alone on a few more types.
+- **Reading:**
+  - On the production input (first message) every API model beats the tuned model clearly, by 10 to 16 points on request type (combined answers), and much more on escalation: the tuned model misses about 1 in 4 chats that need a person (recall 0.72), the API models about 1 to 4 in 100. This is the negative result the brief asks to report plainly.
+  - All three API models do worse with the full conversation (6 to 8 points), the tuned model slightly better, so on that input no difference is significant. A likely reason: the label follows the opening request and the later turns add other topics (warranty_claim recall drops from 0.94 to 0.69 for Haiku). Not tested.
+  - The tuned model wins only on cost and speed. Jev comes close to Haiku on type (0.856 vs 0.875), has the best escalation recall, is about 4 times cheaper and 12 times faster than Haiku, and its questions were written once, not tuned.
+  - Haiku's and Sonnet's pool scores are slightly optimistic: the team tuned their prompt on the 30 validation chats, which are in the pool. The 40 test chats are the clean comparison.
+- **Next:** decide with Neeraj. The saved answers allow, with no new API cost: the tuned model's escalation threshold, a cascade (tuned model first, Jev or Haiku for unsure chats) and how often Jev, Haiku and Sonnet agree on the escalation reason.
+
+## 2026-11-26, Step 3b result: LoRA with more room
+- **What:** ran `notebooks/03b_lora_longer.ipynb` on a Kaggle T4 (commit `a06357b`): LoRA at 3e-4 and 1e-3, 60 epochs, type and escalation heads, 2 x 3 seeds x 5 folds = 30 runs, about 49 s per run. Raw scores in `results/cv_step03b/`; tables, figure and the executed notebook in `results/step03b/`. (The smoke-test time estimate, 272 minutes, was inflated by the first model download; the real run took about 25 minutes.)
+- **Came out (160 out-of-fold chats, mean ± sd over 3 seeds; `cv_summary_step03b.csv`, `comparisons_step03b.csv`):**
+
+  | Model | Epoch | Type macro-F1 | Escalation F2 | Escalation recall (missed of 69) | Combined type acc [95% CI] | vs baseline (only model right / only baseline right, p) |
+  |---|---|---|---|---|---|---|
+  | baseline (full fine-tuning) | 27 | 0.722 ± 0.043 | 0.739 ± 0.013 | 0.715 (19.7) | 0.788 [0.72, 0.86] | |
+  | LoRA 3e-4, 30 epochs (notebook 03, with language head) | 30 | 0.635 ± 0.042 | 0.730 ± 0.017 | 0.720 (19.3) | 0.688 [0.61, 0.76] | 8 / 24, p = 0.007 |
+  | LoRA 3e-4, 60 epochs | 60 | 0.723 ± 0.029 | 0.796 ± 0.032 | 0.787 (14.7) | 0.762 [0.70, 0.83] | 11 / 15, p = 0.56 |
+  | LoRA 1e-3, 60 epochs | 58 | 0.702 ± 0.074 | 0.749 ± 0.102 | 0.729 (18.7) | 0.775 [0.70, 0.85] | 11 / 13, p = 0.84 |
+
+- **Learning curves** (`learning_curves_03b.png`): LoRA at 3e-4 needs about 40 epochs to reach the plateau full fine-tuning reaches at 18, then sits at the same level (about 0.70 to 0.73). LoRA at 1e-3 learns as fast as full fine-tuning but plateaus a little lower and varies much more between seeds.
+- **Reading:**
+  - Given 60 epochs, LoRA at 3e-4 matches full fine-tuning on request type (no measurable difference), is steadier between seeds (sd 0.029 vs 0.043), catches more escalations (F2 0.796 vs 0.739, a gap larger than either spread; about 5 fewer missed chats out of 69), and trains in the same time (49 s for 60 epochs vs about 53 s for 30). Notebook 03's LoRA loss was a time limit, not a ceiling.
+  - Read at epoch 30, the two-head LoRA run (macro-F1 0.688) is above notebook 03's three-head LoRA run (0.635) at the same learning rate; one more hint, untested, that the language head costs request-type accuracy.
+  - Neither changes the comparison with the API models (combined type accuracy 0.76 to 0.79 here vs 0.86 to 0.92 for Jev, Haiku and Sonnet on the first message).
+- **By the selection rules written before the results (EVAL_PROTOCOL section 7):** type macro-F1 is a tie (0.723 vs 0.722); escalation F2 favours LoRA 3e-4 at 60 epochs. The escalation rule is defined "at the threshold chosen above", and no threshold has been chosen yet, so the pick between full fine-tuning and LoRA is made after the threshold analysis.
+- **Bias:** LoRA got three settings tried on these folds, full fine-tuning one; a slight advantage to LoRA in this comparison.
+
+## 2026-11-26, team repo review: what changes for the router
+- **What:** read the team repo (`Salikawtar/northstar-agent`, tip `0cc6208`) and Libo's evaluation hand-off. The team's agent uses the **Haiku** router. Kawtar's fine-tuned router (choices on the 30 validation chats, three heads, full conversation) scored 67.5% on test type and **40% task success in the whole agent against 70% with Haiku** (12 chats lost, none won, p = 0.0005). The main cause: 8 of its 17 handoffs reached the wrong team, 7 of them attacks, because `predict.py` guesses the reason from the request type, and attacks are spread over all 10 types (4 per type in the dataset).
+- **Found:** the team's grader decides the acceptable team from two dataset columns (`request_type`, `adversarial_type`; `evaluation/rules.py`). So the team a handoff reaches can be scored with real labels, and "is this an attack?" is a real label the model can learn (31 in the pool, 5 kinds).
+- **Also from the team repo:** a data-size curve (+28 points per doubling), a break-even study ($71 a month server; beats Haiku above 197,000 chats a month), a LoRA check on validation (she kept full fine-tuning; she noted 3e-4 was under-trained), a fresh held-out set of 32 chats from another model family (`data/fresh/fresh_chats.csv`), and a harness that reruns the agent from a router's recorded answers. Libo's hand-off gives Neeraj one high-priority action: escalation-reason prediction, judged by the right-team rate.
+- **Decisions (Neeraj, 2026-11-26):** language by the word rule; the reason is judged by the right-team rate; three router options compared on the pool (tuned alone with an attack answer; tuned + Jev or Haiku reason step; a language model alone). Protocol updated before any of our routers was scored this way.
+
+## 2026-11-26, Step 5 and 3c build: router options and the attack answer (not yet run)
+- **Code:** `routing.py` (the team's handoff and grader rules, copied from commit `0cc6208`, and the word rule), `router_options.py` (the options built from saved answers), an `attack` head in `model.py`, `train_cv.py`, `protocol.py` (`attack_label` = non-empty `adversarial_type`) and `cv_analysis.py`.
+- **Notebook 03c (GPU, about an hour):** full fine-tuning (2e-5, 30 epochs) and LoRA (3e-4, 60 epochs), each with type, escalation and attack answers, on the first message and the full conversation.
+- **Notebook 05 (CPU, free):** escalation cut-off by F2 on the pool for each tuned model, the protocol's full fine-tuning vs LoRA pick, the word rule, every option scored on type, handoffs, right team, attacks, extra handoffs, share of chats calling a language model and cost; paired tests against Haiku alone; reason agreement between the language models. It adds option 1 by itself once notebook 03c's runs are in the repo.
+- **Checked here (no training, no API calls):** the word rule gets the language right on all 160 pool chats for both inputs; the scoring reproduces the team's finding on our pool (her type rule sends 6 of 31 attacks to the right team, Haiku alone 30 of 31); both notebooks' analysis cells ran end to end, notebook 03c's on fake runs.
