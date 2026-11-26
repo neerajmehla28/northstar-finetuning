@@ -124,8 +124,10 @@ def _predict(model, order, token_ids, labels, cfg, pad_id, device, use_amp):
 
 
 def run_one(cfg: TrainConfig, token_ids, labels, train_idx, val_idx, seed, pad_id, device, epochs=None,
-            encoder_factory=None) -> dict:
-    """Train one model from scratch on `train_idx`; after each epoch score `val_idx`."""
+            encoder_factory=None, score_every_epoch: bool = True, return_model: bool = False) -> dict:
+    """Train one model from scratch on `train_idx`; after each epoch score `val_idx`.
+    The final run (final_run.py) scores only after the last epoch (`score_every_epoch=False`), so no test chat is
+    scored at any other epoch, and may keep the trained model (`return_model=True`, under the key "model")."""
     epochs = epochs or cfg.epochs
     use_amp = bool(cfg.fp16 and device.type == "cuda")
     set_seed(seed)
@@ -142,7 +144,7 @@ def run_one(cfg: TrainConfig, token_ids, labels, train_idx, val_idx, seed, pad_i
     shuffle_rng = np.random.default_rng(seed)                   # decides the chat order in each epoch
 
     hist = {"train_loss": [], "val_loss": [], **{f"logits_{h}": [] for h in cfg.heads}}
-    for _ in range(epochs):
+    for epoch in range(epochs):
         model.train()                                           # dropout on
         loss_sum = 0.0
         for chunk, ids, mask in _batches(shuffle_rng.permutation(train_idx), token_ids, pad_id, device, cfg.batch_size):
@@ -159,17 +161,21 @@ def run_one(cfg: TrainConfig, token_ids, labels, train_idx, val_idx, seed, pad_i
             if scheduler:
                 scheduler.step()
             loss_sum += float(loss) * len(chunk)
-        logits, val_loss = _predict(model, val_idx, token_ids, labels, cfg, pad_id, device, use_amp)
         hist["train_loss"].append(loss_sum / len(train_idx))
-        hist["val_loss"].append(val_loss)
-        for h in cfg.heads:
-            hist[f"logits_{h}"].append(logits[h])
+        if score_every_epoch or epoch == epochs - 1:
+            logits, val_loss = _predict(model, val_idx, token_ids, labels, cfg, pad_id, device, use_amp)
+            hist["val_loss"].append(val_loss)
+            for h in cfg.heads:
+                hist[f"logits_{h}"].append(logits[h])
+    kept = model if return_model else None
     del model, opt, scaler
     gc.collect()
     if device.type == "cuda":
         torch.cuda.empty_cache()
     out = {k: np.array(v, dtype=np.float32) for k, v in hist.items()}
     out["n_trainable"], out["n_total"] = np.array(n_trainable), np.array(n_total)    # how many numbers were trained
+    if kept is not None:
+        out["model"] = kept
     return out
 
 

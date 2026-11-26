@@ -4,3 +4,6 @@ data/conversations/conversations.csv -text
 
 # The team router prompt is used verbatim for the prompted baselines (it is part of every recorded call).
 prompts/router_v3.md -text
+
+# The fresh held-out set, byte for byte (its SHA-256 is checked on every load).
+data/fresh/fresh_chats.csv -text

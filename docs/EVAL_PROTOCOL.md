@@ -112,6 +112,7 @@ Applies to Haiku, Sonnet, any other LLM and Jev.
 2. Train the chosen configurations on all 160 chats with the five final seeds.
 3. Open the test chats once (`NORTHSTAR_ALLOW_TEST=1`, `final=True`, with a note), score every method, and report intervals and paired tests.
 4. After this, no change to the models or the rules is allowed without a new fresh held-out set.
+5. As run (decided 2026-11-26, before opening): the settings are frozen in `config/final_settings.json`; two fine-tuned setups are scored ("safest" and "balanced", see that file for why); the team's fresh held-out set (31 chats, `protocol.fresh_set`, locked like the test chats) is scored alongside the 40 test chats; Haiku, Sonnet and Jev (both versions) run on both sets with the same code. Notebook `06_final_run.ipynb`.
 
 ## 12. To confirm (Neeraj)
 

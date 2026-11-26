@@ -234,3 +234,32 @@ Entry format: **date, step** | what we did | what came out | decision | next.
   - Its cost rose about 3.4 times from version 1 because Jev reads the full rules once per question; dropping the language question (the word rule already does it) or shortening shared text would cut that.
   - A reason step from Jev version 2 does not rescue the fine-tuned router: what remains is the fine-tuned model's own misses and extra handoffs.
   - Caveats: pool chats (the team tuned the prompt on 30 of them, which helps every model that reads it); this is Jev's second question version on the pool; Jev is in early access behind an "alpha" address. The test chats are the clean check.
+
+## 2026-11-26, Step 5 result, second run: every option, strict measure
+- **What:** reran the updated `notebooks/05_router_options.ipynb` on a Kaggle CPU session (commit `65eee80`) with the attack-head runs and Jev version 2 present. Files in `results/step05/` replace the first run's (the first run's executed notebook stays as `05-router-options.ipynb`; this one is `05-router-options-v2.ipynb`; the first run's tables are in git history). The numbers match `comparison_report.py` exactly.
+- **Came out (first message; 69 chats need a person, 31 attacks, 91 do not; strict handled-right; p against Haiku alone):**
+
+  | Router | Missed | Right team | Attacks right | Extra handoffs | Kept, wrong desk | Handled right | p | $ per 1,000 | Seconds |
+  |---|---|---|---|---|---|---|---|---|---|
+  | Sonnet alone | 2 | 66 | 31 | 3 | 2 | 95.0% | 0.039 | 5.38 | 1.00 |
+  | Haiku alone (team) | 3 | 65 | 30 | 9 | 3 | 90.0% | | 0.33 | 2.34 |
+  | Jev, same information | 4 | 63 | 31 | 10 | 0 | 90.0% | 1.00 | 0.25 | 0.46 |
+  | Jev, first version | 1 | 60 | 24 | 22 | 1 | 80.0% | 0.007 | 0.07 | 0.20 |
+  | LoRA + attack answer, own unsure line 40% | 6 | 59 | 25 | 15 | 8 | 79.4% | 0.010 | 0 | 0.25 (team CPU figure) |
+  | LoRA + Jev v2 reason + Jev v2 when unsure | 9 | 58 | 23 | 16 | 9 | 77.5% | < 0.001 | 0.12 | 0.25 + 0.46 on 50% |
+  | LoRA + attack answer, team line 55% | 6 | 59 | 25 | 24 | 5 | 75.6% | < 0.001 | 0 | 0.25 |
+  | Full fine-tuning + attack answer | 2 | 62 | 28 | 45 | 5 | 64.4% | < 0.001 | 0 | 0.25 |
+  | Full fine-tuning, reason from type (her rule) | 4 | 38 | 6 | 36 | 6 | 54.4% | < 0.001 | 0 | 0.25 |
+
+  Full conversation: Sonnet 88.7%, Haiku 86.3%, Jev version 2 85.6% (p = 1.00), best fine-tuned 77.5% (full fine-tuning + Jev v2 reason + cascade), best without a language model 72.5% (full fine-tuning + attack answer, own unsure line 45%).
+- **Unsure line chosen by the rule:** LoRA + attack, first message 40%; full fine-tuning + attack, full conversation 45%; the other two kept 55% (a lower line would have missed more handoffs).
+- **Reason agreement on chats needing a person (first message):** Jev v2 agrees with Sonnet on 97% and with Haiku on 86%; Haiku and Sonnet 88%. Attacks called adversarial: Jev v2 and Sonnet 100%, Haiku 87%, Jev v1 68%.
+- **Reading:** no fine-tuned option reaches Haiku or Jev version 2 on the pool; the best one without any language model (LoRA + attack answer + own unsure line) is about 11 points behind, missing 3 more chats that need a person and sending 6 more to a person who did not need one, at no cost per chat. Hybrids that call a language model for the reason are no better than that and keep half the cost. Jev version 2 is the cheapest and fastest router that matches Haiku.
+- **Open (for Neeraj):** the safety-first rule written in section 7 ranks full fine-tuning + attack answer first (2 missed, 28 attacks right) even though it sends 45 of 91 ordinary chats to a person; LoRA + attack + own line is far better overall but misses 6. Which fine-tuned setup goes to the test chats is decided before they are opened.
+
+## 2026-11-26, Step 6 build: the final run (not yet run; test and fresh chats still closed)
+- **Decision (Neeraj):** score both fine-tuned candidates. "Safest" (full fine-tuning + attack answer) is what the safety-first rule ranks first; "balanced" (LoRA + attack answer + own unsure line 40%) is far better overall. Declaring both now avoids changing the rule after seeing the test chats.
+- **Frozen settings:** `config/final_settings.json`, taken from the pool results (notebook 05 second run, `results/cv_step03c`): inputs, epochs (27 and 60), cut-offs (escalation 0.05 and 0.10, attack 0.05), unsure lines (0.55 and 0.40), 5 seeds (101 to 105) averaged, word rule for language, language models and repeats (Haiku 3, Sonnet 3, Jev v2 2, Jev v1 2, both inputs), budget $6, and the pool estimates to compare against.
+- **Fresh set added:** `data/fresh/fresh_chats.csv` copied from the team repo (commit `0cc6208`) with its review record, SHA-256 checked, 31 chats after the one rejected in review; locked like the test chats (`protocol.fresh_set`).
+- **Code:** `final_run.py` (train on all 160 pool chats and score the held-out chats after the last epoch only, with zeros in place of their answers; combined and per-seed answers; CPU speed with 2 cores; the same scoring for every router; recordings in the format of the team harness's `RecordedRouter`, with the confidence rescaled so the team's 0.55 line acts as the router's own line). `train_cv.run_one` gained `score_every_epoch` and `return_model`. `notebooks/06_final_run.ipynb` runs it all, with a smoke test on practice chats first.
+- **Checked here (no training, no held-out chat opened):** both locks refuse without `final=True` and the switch; the dataset still loads; the scoring, spread, recording and saving cells ran end to end with practice chats standing in for the held-out sets and fake model scores; the confidence rescaling keeps the order and maps 0.40 onto 0.55.
