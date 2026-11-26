@@ -13,6 +13,8 @@ yes/no) built from the SAME wording of that prompt, and returns a probability fo
 
 Every answer is cached on disk under the exact request, so a rerun costs nothing and the results can be
 replayed by anyone without an API key. The key is read by the caller and never written anywhere.
+With no key (`Client(None, cache_dir)`) the client only replays saved answers and stops at the first call it has not
+seen; the notebooks copy the saved answers from the repo first, so a reviewer can rerun them for free.
 """
 from __future__ import annotations
 
@@ -51,6 +53,10 @@ class ApiError(RuntimeError):
 
 class FatalApiError(ApiError):
     """A problem that every later call would share (bad key, no credit, no access): stop, do not carry on."""
+
+
+class ReplayMiss(FatalApiError):
+    """No API key, and this exact call is not among the saved answers: replay cannot continue."""
 
 
 class BudgetExceeded(FatalApiError):
@@ -264,6 +270,9 @@ class Client:
     # -- network -----------------------------------------------------------------------------------------
     def _post(self, url: str, body: dict):
         """Returns (json, seconds). Retries timeouts, rate limits and server errors with a growing wait."""
+        if not self._key:
+            raise ReplayMiss("No API key: this call is not among the saved answers, so it cannot be replayed. "
+                             "Copy the saved answers into the cache folder, or add an OpenRouter key.")
         if self.spent >= self.budget:
             raise BudgetExceeded(f"Spending limit reached: ${self.spent:.2f} of ${self.budget:.2f}.")
         last = ""

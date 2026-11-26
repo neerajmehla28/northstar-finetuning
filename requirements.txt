@@ -1,0 +1,11 @@
+# Analysis, scoring and tests: runs on any laptop (no GPU, no API key).
+numpy
+pandas
+scipy
+scikit-learn
+matplotlib
+requests
+pytest
+
+# Training (notebooks 02, 03, 03b, 03c, 06) runs on a Kaggle T4 GPU, which already has torch and transformers;
+# the notebooks install peft themselves. To train elsewhere: torch, transformers, peft.

@@ -18,3 +18,6 @@ data/labels/
 
 # Downloaded zips of raw runs: their contents are committed unpacked (results/cv_*)
 results/step*/*.zip
+
+# Exception: the final LoRA router's trained add-ons and heads (about 1.2 MB per seed), needed to use the model
+!results/step06/fine_tuned/balanced/*_trained_weights.pt

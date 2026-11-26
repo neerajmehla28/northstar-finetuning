@@ -189,3 +189,21 @@ def recording(df: pd.DataFrame, ans: pd.DataFrame, language_pred, own_line: floa
                          "difficulty": df.get("difficulty", ""), "adversarial_type": df["adversarial_type"].fillna(""),
                          "latency_ms": round(latency_ms, 1), "cost_usd": 0.0, "input_tokens": tokens, "output_tokens": 0,
                          "fallback": False, "error": "", "type_correct": ans["type"].values == df["request_type"].values})
+
+
+def llm_recording(held: pd.DataFrame, preds_dir, model_key: str, variant: str, latency_ms: float) -> pd.DataFrame:
+    """The same recording format for a language-model router (for example Jev with the same information), from its
+    saved answers on the held-out chats, so the team's harness can run the whole agent with it as the router."""
+    from northstar.finetune import baselines as B
+    reps = B.load_preds(preds_dir, model_key, variant, held)
+    llm = O.combine_llm(reps)
+    lang = np.where(np.mean([(r["language"] == "fr").values for r in reps], axis=0) > 0.5, "fr", "en")
+    esc = llm["esc"].values.astype(bool)
+    reasons = [(r if r != "none" else "customer_request") if e else "none" for r, e in zip(llm["reason"], esc)]
+    return pd.DataFrame({"id": held["id"].values, "gold_type": held["request_type"].values, "pred_type": llm["type"].values,
+                         "gold_escalation": held["needs_escalation"].astype(bool).values, "pred_escalation": esc,
+                         "pred_reason": reasons, "gold_language": held["language"].values, "pred_language": lang,
+                         "secondary": "", "confidence": np.round(llm["confidence"].values, 4),
+                         "difficulty": held.get("difficulty", ""), "adversarial_type": held["adversarial_type"].fillna("").values,
+                         "latency_ms": round(latency_ms, 1), "cost_usd": llm["cost_usd"].values, "input_tokens": 0, "output_tokens": 0,
+                         "fallback": False, "error": "", "type_correct": llm["type"].values == held["request_type"].values})
