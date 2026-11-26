@@ -67,6 +67,7 @@ Every router is compared on all three, on the same chats:
 | Escalation | F2 (recall counts twice as much as precision) | recall, precision, accuracy, missed escalations (count) |
 | Reason | right-team rate: chats needing a person that reach a team the grader accepts, out of all chats needing a person (a missed handoff counts as wrong) | attacks sent to the right team; wrong-team count; extra handoffs |
 | Attack | F2 | recall, precision |
+| Whole handoff decision | handled right (strict): share of chats fully right: a person and an acceptable team when one is needed; when not, the AI keeps the chat and the right desk answers it | the same without the desk check ("rule checks only", as the team's rule checks); kept with the wrong desk |
 | Language | accuracy | |
 | Confidence | expected calibration error (10 equal-width bins) | Brier score, reliability table |
 | System | cost per chat, median and p90 latency | parameters, memory |
@@ -80,6 +81,8 @@ Every router is compared on all three, on the same chats:
 - Type models: highest cross-validated mean macro-F1. Ties (within one seed-to-seed standard deviation) go to the simpler, cheaper, faster option.
 - Escalation head: highest cross-validated mean F2 at the threshold chosen above.
 - Nothing is chosen using the test chats, including the cascade threshold and trigger rules.
+- Router choice (added 2026-11-26): safety first (missed handoffs, handoffs to the right team, attacks to the right team), then efficiency (extra handoffs, chats kept with the wrong desk); strict handled-right summarises both. A safety measure is never traded for efficiency.
+- Unsure line for a tuned router (added 2026-11-26): the team's pipeline hands a chat to a person below a confidence line (0.55, set for Haiku). For a tuned router the line is chosen on the pool from 0.55, 0.50, ..., 0.20, 0: the best strict handled-right that never misses more handoffs than 0.55 does; ties go to the higher line (`router_options.choose_floor`).
 
 ## 8. Uncertainty and comparisons
 
@@ -123,4 +126,5 @@ Applies to Haiku, Sonnet, any other LLM and Jev.
 - 2026-11-25: draft v1 written.
 - 2026-11-25: fold method changed from random stratified-group draws to a balancing search (first draw was too lopsided on language). Folds are produced on Kaggle and committed.
 - 2026-11-25: section 9, before any baseline run: one schema (the team's prompt unchanged, three answers scored) instead of two; API latency from 40 sequential calls.
+- 2026-11-26, after a first look at the attack-head results on the pool (test chats untouched): strict handled-right (desk checked) replaces the rule-checks-only version as the main summary, both reported; safety-first router choice and the unsure-line rule added to section 7.
 - 2026-11-26, after the team's end-to-end result (its fine-tuned router lost on handoff teams) and before any of our routers was scored this way: the reason is scored by the right-team rate with the grader's own rule; an attack yes/no output is added (real label); language comes from the word rule. Router options compared on the pool: tuned alone (type rule or attack answer), tuned + language-model reason step, plus cascade, and language model alone.

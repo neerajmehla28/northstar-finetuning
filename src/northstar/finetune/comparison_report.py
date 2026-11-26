@@ -43,8 +43,8 @@ def routers_table(pool: pd.DataFrame) -> pd.DataFrame:
     groups = pool["customer_id"].values
     rows, handled = [], {}
 
-    def add(v, family, name, ans, language_pred, llm_name=None, model_esc=None):
-        s, routed = O.score(pool, ans)
+    def add(v, family, name, ans, language_pred, llm_name=None, model_esc=None, floor=R.FLOOR):
+        s, routed = O.score(pool, ans, floor)
         ok = ans["type"].values == gold_type
         esc = np.asarray(model_esc if model_esc is not None else ans["esc"], bool)
         hr = routed["handled_right"].values.astype(float)
@@ -66,7 +66,8 @@ def routers_table(pool: pd.DataFrame) -> pd.DataFrame:
                          esc_false_alarms=int((esc & ~gold_esc).sum()), esc_not_needed=int((~gold_esc).sum()),
                          right_team=s["right_team"], wrong_team=s["wrong_team"], missed=s["missed"],
                          attacks_right_team=s["attacks_right_team"], attacks=s["attacks"],
-                         extra_handoffs=s["extra_handoffs"], handled_right=hr.mean(), handled_ci_low=h_lo, handled_ci_high=h_hi,
+                         extra_handoffs=s["extra_handoffs"], kept_wrong_desk=s["kept_wrong_desk"], unsure_line=floor,
+                         handled_right=hr.mean(), handled_ci_low=h_lo, handled_ci_high=h_hi, handled_right_rules=s["handled_right_rules"],
                          llm_share=share, usd_per_1000=s["usd_per_1000"], seconds=speed))
 
     sources = {m: root / "step04" / "preds" for m in ("haiku", "sonnet", "jev")}
@@ -96,6 +97,22 @@ def routers_table(pool: pd.DataFrame) -> pd.DataFrame:
                 casc = O.option_cascade(t, llm[(m, v)])
                 add(v, "Fine-tuned + language model for the reason", f"{label} + {names[m].split(' (')[0]} reason + {names[m].split(' (')[0]} when unsure",
                     casc, word_rule[v], m, casc["esc"])
+        attack_sources = {"Fine-tuned XLM-R, full": root / "cv_step03c" / "full_attack",
+                          "Fine-tuned XLM-R, LoRA": root / "cv_step03c" / "lora_attack"}
+        for label, folder in attack_sources.items():
+            if not (folder / v).exists():
+                continue
+            oof = A.assemble(A.load_variant(folder, v), pool, ("type", "escalation", "attack"))
+            e_star, _ = A.pick_epoch(A.epoch_curves(oof, pool))
+            t = O.tuned_answers(oof, pool, e_star, O.choose_cutoff(oof, pool, e_star)[0],
+                                O.choose_cutoff(oof, pool, e_star, "attack", "attack_label")[0])
+            ans = O.option_attack_head(t)
+            add(v, "Fine-tuned + attack answer", f"{label} + attack answer", ans, word_rule[v], None, ans["esc"])
+            line, _ = O.choose_floor(pool, ans)
+            if line == R.FLOOR:          # the rule kept the team's line: no separate row
+                continue
+            add(v, "Fine-tuned + attack answer", f"{label} + attack answer, own unsure line ({line:.0%})", ans, word_rule[v], None,
+                ans["esc"], line)
     table = pd.DataFrame(rows)
     p = []
     for _, r in table.iterrows():
@@ -116,7 +133,12 @@ def training_table(pool: pd.DataFrame) -> pd.DataFrame:
               ("LoRA 1e-4, 30 epochs (+ language head)", root / "cv_step03" / "lora_1e4", "first_message", ("type", "escalation", "language")),
               ("LoRA 3e-4, 30 epochs (+ language head)", root / "cv_step03" / "lora_3e4", "first_message", ("type", "escalation", "language")),
               ("LoRA 3e-4, 60 epochs", root / "cv_step03b" / "lora_3e4_60ep", "first_message", ("type", "escalation")),
-              ("LoRA 1e-3, 60 epochs", root / "cv_step03b" / "lora_1e3_60ep", "first_message", ("type", "escalation"))]
+              ("LoRA 1e-3, 60 epochs", root / "cv_step03b" / "lora_1e3_60ep", "first_message", ("type", "escalation")),
+              ("Full fine-tuning + attack answer", root / "cv_step03c" / "full_attack", "first_message", ("type", "escalation", "attack")),
+              ("Full fine-tuning + attack answer", root / "cv_step03c" / "full_attack", "full_conversation", ("type", "escalation", "attack")),
+              ("LoRA 3e-4, 60 epochs + attack answer", root / "cv_step03c" / "lora_attack", "first_message", ("type", "escalation", "attack")),
+              ("LoRA 3e-4, 60 epochs + attack answer", root / "cv_step03c" / "lora_attack", "full_conversation", ("type", "escalation", "attack"))]
+    setups = [s for s in setups if (s[1] / s[2]).exists()]
     en, fr = (pool["language"] == "en").values, (pool["language"] == "fr").values
     rows = []
     for name, folder, v, heads in setups:
@@ -137,6 +159,53 @@ def training_table(pool: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+SECONDS_02 = {"first_message": 52, "customer_turns": 58, "full_conversation": 71}   # notebook 02 run log (LAB_NOTES, Step 2)
+
+
+def page_routers(table: pd.DataFrame) -> pd.DataFrame:
+    """The routers table rounded and named for the scorecard page; `key` is a stable row id."""
+    def short(name):
+        n = name.replace("Claude Haiku 5.5 (team's router)", "Haiku (team's router)").replace("Claude Sonnet 5.5", "Sonnet")
+        n = n.replace("Jev 1.14, same information", "Jev, same information as Haiku").replace("Jev 1.14", "Jev, first version")
+        n = n.replace("Fine-tuned XLM-R, ", "Fine-tuned (").replace(" (reason guessed from type)", ") alone, reason guessed from type")
+        n = n.replace("Claude Haiku 5.5", "Haiku").replace("Claude Sonnet 5.5", "Sonnet")
+        if n.startswith("Fine-tuned (") and ")" not in n[12:].split(" ")[0]:
+            n = n.replace(" + ", ") + ", 1)
+        return n
+    out, seen = [], set()
+    for _, x in table.iterrows():
+        name = short(x.router)
+        key = ("fm-" if x.input == "first_message" else "fc-") + "".join(ch for ch in name.lower() if ch.isalnum())[:48]
+        assert key not in seen, key
+        seen.add(key)
+        pct = lambda v: round(float(v) * 100, 1)
+        pv = x.p_vs_haiku_handled
+        out.append(dict(key=key, input=x.input, kind=x.family, router=name,
+                        type_right=pct(x.type_accuracy), type_range=f"{x.type_ci_low * 100:.0f}–{x.type_ci_high * 100:.0f}",
+                        english=pct(x.type_accuracy_en), french=pct(x.type_accuracy_fr), language=pct(x.language_accuracy),
+                        caught=int(x.esc_caught), false_alarms=int(x.esc_false_alarms), missed=int(x.missed),
+                        right_team=int(x.right_team), attacks_right=int(x.attacks_right_team),
+                        extra_handoffs=int(x.extra_handoffs), kept_wrong_desk=int(x.kept_wrong_desk),
+                        handled_right=pct(x.handled_right), handled_range=f"{x.handled_ci_low * 100:.0f}–{x.handled_ci_high * 100:.0f}",
+                        p_vs_haiku=("reference" if pd.isna(pv) else ("<0.001" if pv < 0.001 else f"{pv:.3f}")),
+                        llm_share=round(float(x.llm_share) * 100), usd_per_1000=round(float(x.usd_per_1000), 3), seconds=x.seconds))
+    return pd.DataFrame(out)
+
+
+def page_training(training: pd.DataFrame) -> pd.DataFrame:
+    rows = []
+    for i, x in training.iterrows():
+        secs = x.seconds_per_run if not pd.isna(x.seconds_per_run) else SECONDS_02[x.input]
+        rows.append(dict(key=f"t{i + 1}", setup=x.setup, input=x.input.replace("_", " "), epoch=int(x.epoch),
+                         type_right=round(x.type_accuracy_mean * 100, 1), spread=round(x.type_accuracy_sd * 100, 1),
+                         macro_f1=round(x.type_macro_f1_mean, 3), combined=round(x.combined_type_accuracy * 100, 1),
+                         english=round(x.combined_type_accuracy_en * 100, 1), french=round(x.combined_type_accuracy_fr * 100, 1),
+                         esc_recall=round(x.esc_recall_default * 100, 1), esc_precision=round(x.esc_precision_default * 100, 1),
+                         language_head=("" if pd.isna(x.language_head_accuracy) else round(x.language_head_accuracy * 100, 1)),
+                         trained=int(x.trained_numbers), seconds=int(round(secs))))
+    return pd.DataFrame(rows)
+
+
 def main() -> None:
     pool = P.pool(P.load_all())
     OUT.mkdir(parents=True, exist_ok=True)
@@ -144,6 +213,8 @@ def main() -> None:
     routers.to_csv(OUT / "routers_pool.csv", index=False)
     training = training_table(pool)
     training.to_csv(OUT / "training_variants.csv", index=False)
+    page_routers(routers).to_csv(OUT / "page_routers.csv", index=False)
+    page_training(training).to_csv(OUT / "page_training.csv", index=False)
     pd.set_option("display.width", 250)
     print(routers[["input", "router", "type_accuracy", "type_accuracy_fr", "esc_caught", "esc_false_alarms", "right_team",
                    "attacks_right_team", "extra_handoffs", "handled_right", "p_vs_haiku_handled", "usd_per_1000"]].round(3).to_string())

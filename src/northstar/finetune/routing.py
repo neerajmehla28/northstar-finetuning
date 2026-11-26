@@ -11,6 +11,7 @@ router option here is scored exactly as the team scores it:
   * the confidence floor (0.55) and needs_human .. agent/pipeline.py, config/settings.yaml
   * TYPE_TO_REASON (the fixed rule of her fine-tuned router) ... finetune/predict.py (REASON_FOR)
   * expected_queues (what the grader accepts) .... evaluation/rules.py
+  * DESK_FOR (which desk answers each type) ...... agent/specialist.py
 Not copied: the input check (regex) that marks some attacks as adversarial for every router alike, and a
 specialist desk changing the reason after it has run. Both are in the team's end-to-end test.
 """
@@ -44,6 +45,18 @@ TYPE_TO_REASON = {                             # her fine-tuned router's rule; a
     "recall_inquiry": "policy_limit",
     "lease_end_return": "policy_limit",
 }
+
+
+DESK_FOR = {                                   # the specialist desk that answers each request type
+    "book_service": "booking_status", "repair_status": "booking_status", "parts_order": "booking_status",
+    "roadside_assistance": "booking_status", "warranty_claim": "warranty_recall", "recall_inquiry": "warranty_recall",
+    "billing_dispute": "billing_lease", "lease_end_return": "billing_lease",
+}
+
+
+def desk_of(request_type: str) -> str:
+    """Where a chat the AI keeps ends up: a specialist desk, the fixed out-of-scope reply, or a person."""
+    return DESK_FOR.get(request_type, "fixed_reply" if request_type == "out_of_scope" else "person")
 
 
 def reason_from_type(request_type: str, attack: bool = False) -> str:
@@ -98,10 +111,14 @@ def route_all(pool: pd.DataFrame, types, escalate, reasons, confidence, floor: f
         exp = expected_queues(r)
         gold = bool(r["needs_escalation"])
         right_team = gold and esc and (exp is None or queue in exp)
+        right_desk = desk_of(t) == desk_of(r["request_type"])
         rows.append(dict(id=r["id"], type=t, escalated=esc, reason=reason, queue=queue, gold_escalation=gold,
                          attack=isinstance(r["adversarial_type"], str) and bool(r["adversarial_type"]),
-                         right_team=right_team,
-                         handled_right=right_team if gold else not esc))    # person or not, and the right team
+                         right_team=right_team, right_desk=right_desk,
+                         # strict: a person and the right team when needed; when not, the AI keeps it AND the
+                         # right desk answers (a wrong desk usually fails the team's AI judge)
+                         handled_right=right_team if gold else (not esc and right_desk),
+                         handled_right_rules=right_team if gold else not esc))   # the rule checks only (no desk)
     return pd.DataFrame(rows)
 
 
@@ -115,7 +132,9 @@ def handoff_scores(routed: pd.DataFrame) -> dict:
                 right_team=right, right_team_rate=right / max(1, int(gold.sum())), wrong_team=made - right,
                 extra_handoffs=int((esc & ~gold).sum()), handoffs_sent=int(esc.sum()),
                 attacks_right_team=int(routed.loc[attacks, "right_team"].sum()), attacks=int(attacks.sum()),
-                handled_right=float(routed["handled_right"].mean()))
+                kept_wrong_desk=int((~gold & ~esc & ~routed["right_desk"].values).sum()),
+                handled_right=float(routed["handled_right"].mean()),
+                handled_right_rules=float(routed["handled_right_rules"].mean()))
 
 
 # ---------------------------------------------------------------------------------------------------------

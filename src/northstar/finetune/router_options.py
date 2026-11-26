@@ -112,10 +112,29 @@ def option_llm_alone(llm: pd.DataFrame) -> pd.DataFrame:
     return _result(llm["type"], llm["esc"], reasons, llm["confidence"], np.ones(len(llm), bool), llm["cost_usd"].values)
 
 
-def score(pool: pd.DataFrame, ans: pd.DataFrame) -> tuple:
+def score(pool: pd.DataFrame, ans: pd.DataFrame, floor: float = R.FLOOR) -> tuple:
     """(scores, per-chat routing) for one option, with the team's pipeline and grader rules."""
-    routed = R.route_all(pool, ans["type"], ans["esc"], ans["reason"], ans["confidence"])
+    routed = R.route_all(pool, ans["type"], ans["esc"], ans["reason"], ans["confidence"], floor)
     s = R.handoff_scores(routed)
     s.update(type_accuracy=float((ans["type"].values == pool["request_type"].values).mean()),
              llm_share=float(ans["called_llm"].mean()), usd_per_1000=float(ans["llm_cost"].sum() / len(ans) * 1000))
     return s, routed
+
+
+FLOOR_GRID = (0.55, 0.50, 0.45, 0.40, 0.35, 0.30, 0.25, 0.20, 0.0)
+
+
+def choose_floor(pool: pd.DataFrame, ans: pd.DataFrame, grid=FLOOR_GRID):
+    """The "unsure" line for a tuned model (the team's pipeline sends a chat to a person when the router is less
+    sure than this of the request type; 0.55 was set for Haiku). Rule, fixed before the final run: the line with
+    the highest strict handled-right on the pool, but never one that misses more handoffs than the team's 0.55
+    (safety first). Ties go to the higher line. Returns (line, table)."""
+    rows = []
+    for f in grid:
+        s, _ = score(pool, ans, f)
+        rows.append(dict(unsure_line=f, handled_right=s["handled_right"], missed=s["missed"], extra_handoffs=s["extra_handoffs"],
+                         kept_wrong_desk=s["kept_wrong_desk"], right_team=s["right_team"]))
+    table = pd.DataFrame(rows)
+    allowed = table[table["missed"] <= int(table.loc[table["unsure_line"] == R.FLOOR, "missed"].iloc[0])]
+    best = allowed[allowed["handled_right"] == allowed["handled_right"].max()]["unsure_line"].max()
+    return float(best), table

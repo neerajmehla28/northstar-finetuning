@@ -7,3 +7,7 @@ t5,"LoRA 1e-4, 30 epochs (+ language head)",first message,30,26.0,1.6,0.226,27.5
 t6,"LoRA 3e-4, 30 epochs (+ language head)",first message,30,63.8,4.4,0.635,68.8,75.0,57.1,72.0,77.4,99.8,304909,27
 t7,"LoRA 3e-4, 60 epochs",first message,60,72.5,2.7,0.723,76.2,79.8,69.6,78.7,83.2,,303371,49
 t8,"LoRA 1e-3, 60 epochs",first message,58,70.2,7.8,0.702,77.5,82.7,67.9,72.9,85.3,,303371,49
+t9,Full fine-tuning + attack answer,first message,27,63.3,6.7,0.632,71.9,76.9,62.5,70.5,91.0,,278052876,52
+t10,Full fine-tuning + attack answer,full conversation,30,75.2,2.0,0.752,76.9,78.8,73.2,78.7,89.6,,278052876,72
+t11,"LoRA 3e-4, 60 epochs + attack answer",first message,60,72.5,4.5,0.722,78.8,81.7,73.2,75.8,85.5,,304140,49
+t12,"LoRA 3e-4, 60 epochs + attack answer",full conversation,50,71.0,1.4,0.707,73.8,77.9,66.1,77.8,88.1,,304140,85
