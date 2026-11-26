@@ -15,3 +15,6 @@ data/labels/
 
 # Secrets
 .env
+
+# Downloaded zips of raw runs: their contents are committed unpacked (results/cv_*)
+results/step*/*.zip

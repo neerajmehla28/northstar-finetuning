@@ -79,3 +79,29 @@ Entry format: **date, step** | what we did | what came out | decision | next.
 - **Checked here (no network, fake answers):** prompt parsing, answer parsing (good, malformed, refused), resume and replay from the cache, a run of mostly unusable answers is refused instead of saved, a key or credit error stops the run, and the notebook's scoring cells run end to end. The tuned-model rows reproduce notebook 02 (first message: 0.719 single run, 0.756 combined).
 - **Expected cost:** about $6 (mostly Sonnet), hard stop at $10. Runs on a CPU notebook, so it can run while notebook 03 trains.
 - **Protocol change (before any baseline result):** one schema instead of two; see EVAL_PROTOCOL section 9 and its changelog.
+
+## 2026-11-25, Step 3 result: language head and LoRA
+- **What:** ran `notebooks/03_language_head_and_lora.ipynb` on a Kaggle T4 (commit `15fddb8`, with the `torchao` line added by hand in Kaggle): 3 new models x 3 seeds x 5 folds = 45 runs, first-message input, 30 epochs. Raw scores in `results/cv_step03/` (45 runs and a config per model; all record commit `15fddb8`, Tesla T4, the team dataset); tables, figure and the executed notebook in `results/step03/`.
+- **Came out (160 out-of-fold chats, each model at its own best epoch, mean ± sd over 3 seeds; `results/step03/cv_summary_step03.csv`):**
+
+  | Model | Epoch | Type accuracy | Type macro-F1 | Escalation recall | Escalation precision | Language | Combined type acc [95% CI] | Trained numbers | s per run |
+  |---|---|---|---|---|---|---|---|---|---|
+  | baseline (notebook 02) | 27 | 0.721 ± 0.043 | 0.722 ± 0.043 | 0.715 ± 0.017 | 0.857 ± 0.032 | no head | 0.788 [0.72, 0.86] | 278 million | 52 |
+  | full_3heads | 30 | 0.700 ± 0.051 | 0.699 ± 0.048 | 0.734 ± 0.059 | 0.868 ± 0.016 | 1.000 | 0.744 [0.67, 0.82] | 278,053,645 | 54 |
+  | lora_1e4 | 30 | 0.260 ± 0.016 | 0.226 ± 0.014 | 0.377 ± 0.091 | 0.616 ± 0.019 | 0.992 | 0.275 [0.21, 0.34] | 304,909 | 27 |
+  | lora_3e4 | 30 | 0.638 ± 0.044 | 0.635 ± 0.042 | 0.720 ± 0.008 | 0.774 ± 0.057 | 0.998 | 0.688 [0.61, 0.76] | 304,909 | 27 |
+
+  (The baseline's 52 s per run is from notebook 02. Its best epoch is 27 here because the rule is applied to the first-message runs alone; notebook 02 applied it to all three inputs together and got 29.)
+- **Paired tests against the baseline** (combined answers, exact McNemar; `comparisons_step03.csv`): full_3heads right on 3 chats the baseline missed, baseline right on 10 it missed, p = 0.092; lora_3e4 8 vs 24, p = 0.007; lora_1e4 4 vs 86, p < 0.001.
+- **Language** (`language_accuracy.csv`, combined answers): full_3heads and lora_3e4 1.000 on both English (104) and French (56); lora_1e4 0.988 (misses 2 English chats) although it gets only 26% of request types right.
+- **Learning curves** (`learning_curves.png`): full fine-tuning rises from epoch 7 and plateaus from about epoch 18, as in notebook 02; full_3heads sits slightly below the baseline from about epoch 10 on. LoRA at 3e-4 is still climbing steeply at epoch 30 (under-trained in this budget); LoRA at 1e-4 barely learns.
+- **Reading:**
+  - Language is easy in this data: every model gets it, even one that has not learned the request types. The language head adds nothing over the simple word rule (100% in an earlier check) and leans against request type (10 vs 3 chats, p = 0.09, not significant).
+  - LoRA loses clearly under this budget, and it is not steadier (sd 0.044 vs 0.051). It trains 0.11% of the numbers (the notebook text first said "about 1%", which was wrong; corrected) and halves training time, which does not matter at 54 s per run; at run time it is as fast as the full model.
+- **Decision:** pending (Neeraj): language from the third head or from the word rule; whether to give LoRA one more learning rate (1e-3) before reporting it as a negative result.
+
+## 2026-11-25, Step 3b build: LoRA with more room (not yet run)
+- **Why:** in notebook 03, LoRA at 3e-4 was still climbing steeply at epoch 30, so its loss may be a time limit, not a ceiling. Before reporting LoRA as a negative result it gets a fair chance.
+- **What:** `notebooks/03b_lora_longer.ipynb`: LoRA at 3e-4 and at 1e-3, 60 epochs each, type and escalation heads only (the same heads as the baseline, so only LoRA differs; notebook 03's LoRA also carried the language head). Same folds, input, seeds and LoRA size. The 60-epoch runs are also read at epoch 30. Compared with the baseline and notebook 03's 30-epoch LoRA run, read from the repo. About 30 to 35 minutes on a T4.
+- **Checked here (no training):** the analysis cells ran on fake 60-epoch runs made by repeating notebook 03's saved LoRA runs; the baseline and LoRA rows reproduce notebook 03 exactly.
+- **Bias, stated up front:** trying more LoRA settings and keeping the best, on the folds it is scored on, favours LoRA slightly.
