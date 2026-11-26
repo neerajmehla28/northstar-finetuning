@@ -163,3 +163,56 @@ Entry format: **date, step** | what we did | what came out | decision | next.
 - **Notebook 03c (GPU, about an hour):** full fine-tuning (2e-5, 30 epochs) and LoRA (3e-4, 60 epochs), each with type, escalation and attack answers, on the first message and the full conversation.
 - **Notebook 05 (CPU, free):** escalation cut-off by F2 on the pool for each tuned model, the protocol's full fine-tuning vs LoRA pick, the word rule, every option scored on type, handoffs, right team, attacks, extra handoffs, share of chats calling a language model and cost; paired tests against Haiku alone; reason agreement between the language models. It adds option 1 by itself once notebook 03c's runs are in the repo.
 - **Checked here (no training, no API calls):** the word rule gets the language right on all 160 pool chats for both inputs; the scoring reproduces the team's finding on our pool (her type rule sends 6 of 31 attacks to the right team, Haiku alone 30 of 31); both notebooks' analysis cells ran end to end, notebook 03c's on fake runs.
+
+## 2026-11-26, Step 5 result: router options scored by the team that gets the handoff
+- **What:** ran `notebooks/05_router_options.ipynb` on a Kaggle CPU session (commit `74fcb57`), no API calls. Notebook 03c had not run yet, so option 1 (attack answer) is not in it. Results in `results/step05/` (`router_options.csv`, `tuned_candidates.csv`, `paired_vs_haiku.csv`, `reason_agreement.csv`, `language_word_rule.csv`, `right_team_vs_cost.png`, executed notebook).
+- **Word rule:** language right on all 160 pool chats, both inputs.
+- **Tuned models (escalation cut-off chosen by F2 on the pool):** full fine-tuning, first message: cut-off 0.05, 7 of 69 handoffs missed, 26 false alarms; LoRA 60 epochs: cut-off 0.10, 10 missed, 16 false alarms. The protocol's rule picks LoRA (request type a tie; escalation F2 at the cut-off 0.847 vs 0.842, a negligible gap).
+- **Options, first message (69 chats need a person, 31 of them attacks; "handled right" = person or not, and the right team, over all 160 chats):**
+
+  | Option | Right team | Attacks right | Missed | Extra handoffs | Handled right | Language model used on | $ per 1,000 chats | vs Haiku alone (only option right / only Haiku right, p) |
+  |---|---|---|---|---|---|---|---|---|
+  | Haiku alone (the team's agent) | 65 of 69 | 30 of 31 | 3 | 9 | 0.919 | 100% | 0.33 | |
+  | Sonnet alone | 66 | 31 | 2 | 3 | 0.963 | 100% | 5.38 | 8 / 1, p = 0.039 |
+  | Jev alone | 60 | 24 | 1 | 22 | 0.806 | 100% | 0.07 | 7 / 25, p = 0.002 |
+  | Tuned (full FT), her type rule | 38 | 6 | 4 | 36 | 0.581 | 0% | 0 | 4 / 58, p < 0.001 |
+  | Tuned (full FT) + Haiku reason | 59 | 26 | 4 | 36 | 0.713 | 55% | 0.19 | 4 / 37, p < 0.001 |
+  | Tuned (full FT) + Haiku reason + cascade | 61 | 28 | 4 | 27 | 0.781 | 63% | 0.21 | 4 / 26, p < 0.001 |
+  | Tuned (LoRA) + Haiku reason + cascade | 59 | 22 | 9 | 17 | 0.831 | 50% | 0.17 | 5 / 19, p = 0.007 |
+  | Tuned (full FT) + Jev reason + cascade | 55 | 23 | 4 | 29 | 0.731 | 63% | 0.05 | 5 / 35, p < 0.001 |
+
+  Full conversation: the same picture (Haiku alone 66 of 69, handled right 0.912; best tuned option, full FT + Haiku reason + cascade, 61 of 69, 0.794, p < 0.001); Jev's reason collapses on this input (it calls 19% of attacks "adversarial", against 68% on the first message).
+- **Reason agreement on the chats needing a person** (`reason_agreement.csv`): Haiku and Sonnet agree on 88%; Jev agrees with them on 72 to 74% (first message) and 46 to 54% (full conversation). Attacks called "adversarial": Sonnet 100%, Haiku 87%, Jev 68% (first message).
+- **Reading:**
+  - A reason step fixes most of the team problem: with Haiku's reason, 59 to 61 of 69 handoffs reach the right team instead of 38 with the type rule, and 26 to 28 of 31 attacks instead of 6.
+  - It does not make the tuned router as good as Haiku alone. What remains is the tuned model's yes/no on "needs a person": with the F2 cut-off it sends 27 to 36 chats to a person who did not need one (the team's grader counts each as a failure), and with LoRA it misses 9. Every tuned option is clearly worse than Haiku alone on "handled right" (p from 0.007 to below 0.001).
+  - It also keeps most of the cost: the best hybrid calls Haiku on 50 to 63% of chats and saves at most half of a router bill that is $0.33 per 1,000 chats.
+  - Jev is not a drop-in replacement: cheap and fast, but its reason is weak (worst on the full conversation) and it sends 22 chats to a person who did not need one.
+  - Sonnet alone is the best router on the pool (better than Haiku on the first message, p = 0.039; not on the full conversation, p = 0.23) at 16 times the cost; the team's end-to-end test found no gain from it.
+- **Not settled here:** option 1 (attack answer) waits for notebook 03c. The escalation cut-off was chosen by F2 (missing a handoff counts double), while the team's grader counts a missed and an extra handoff the same; a cut-off chosen for "handled right" would trade misses for fewer extra handoffs (a sensitivity check, not a new selection).
+
+## 2026-11-26, comparison scorecard
+- **What:** `src/northstar/finetune/comparison_report.py` builds one comparison of every router setup on the 160 pool chats from saved results only (no training, no API calls): `results/comparison/routers_pool.csv` (21 setups: Haiku, Sonnet, Jev alone; fine-tuned full and LoRA alone and with a Haiku or Jev reason step, with and without the cascade; both inputs) and `results/comparison/training_variants.csv` (8 training setups). The `page_*.csv` files are the same numbers, rounded for display, plus the team's own test-set results copied from the team repo (commit `0cc6208`).
+- **Published:** the scorecard page "Northstar Router Scorecard" (private claude.ai artifact) shows these four tables with definitions and caveats.
+- **Numbers:** identical to notebook 05 where they overlap (for example, handled right on the first message: Haiku 91.9%, Sonnet 96.2%, Jev 80.6%, best fine-tuned setup 83.1%).
+
+## 2026-11-26, Step 4b build: Jev with the same information as Haiku and Sonnet (not yet run)
+- **Found (Neeraj asked for the check):** in notebook 04, Jev was not told what Haiku and Sonnet were told. It got the request types, the tie-breaks and the escalation rules (on its yes/no question only), but none of the prompt's 6 worked examples, and its reason question had one-line definitions written by us (for example "the message deliberately tries to trick the assistant" instead of the prompt's five kinds of attack and its list of what is not an attack). Instruction length per question was 158 to 2,174 characters.
+- **Version 2** (`jev_questions_v2` in `baselines.py`, model key `jev2`, same model `typesafe/jev-1.14`): every question gets the team prompt's rules (first paragraph, Request types, Escalation, Language), the 6 worked examples with that question's answer, and reason definitions copied from the prompt; about 5,000 characters per question. Left out: the lines about returning JSON and a confidence number. Still different by design: Jev answers each question on its own.
+- **Cost note:** Jev is priced per word read and repeats the instructions for each of its four questions, so version 2 reads about twice the text Haiku reads per chat. The run measures the real cost.
+- **Notebook 04b** (CPU, key needed, expected well under $1, hard stop $3) runs version 2 on the pool with both inputs and 2 repeats, plus 40 one-at-a-time speed calls, and compares it with version 1, Haiku and Sonnet. Notebook 05 and `comparison_report.py` now include Jev version 2 automatically when `results/step04b/preds` exists. Checked here with a fake network and fake answers: the calls carry the version-2 questions, version 1 is unchanged, and the notebook 04b, notebook 05 and scorecard code all run with version 2 present.
+- **Iteration count (protocol section 9):** Jev's questions are now on version 2 on the pool; Haiku's and Sonnet's prompt had three team versions.
+
+## 2026-11-26, Step 3c result: the attack answer
+- **What:** ran `notebooks/03c_attack_head.ipynb` on a Kaggle T4 (commit `74fcb57`): full fine-tuning (2e-5, 30 epochs) and LoRA (3e-4, 60 epochs) with type, escalation and attack answers, on the first message and the full conversation; 4 x 3 seeds x 5 folds = 60 runs, all complete. Raw scores in `results/cv_step03c/`; tables and the executed notebook in `results/step03c/`.
+- **Came out (160 pool chats, each setup at its own best epoch; attack answer at the plain 50% cut-off; `attack_head_summary.csv`):**
+
+  | Setup | Input | Type macro-F1 (without attack answer) | Type vs without: only new right / only old right (p) | Attacks caught, combined (of 31) | False attack alarms (of 129) | Attack recall / precision, mean of seeds |
+  |---|---|---|---|---|---|---|
+  | Full fine-tuning | first message | 0.632 ± 0.069 (0.722) | 4 / 15 (p = 0.02) | 14 | 0 | 0.45 / 0.95 |
+  | Full fine-tuning | full conversation | 0.752 ± 0.024 (0.747) | 9 / 10 (p = 1.00) | 20 | 0 | 0.68 / 0.95 |
+  | LoRA 60 epochs | first message | 0.722 ± 0.047 (0.723) | 10 / 6 (p = 0.45) | 14 | 1 | 0.52 / 0.93 |
+  | LoRA 60 epochs | full conversation | 0.707 ± 0.014 (none) | | 16 | 1 | 0.54 / 0.90 |
+
+- **By kind** (best setup by attack F2, `attacks_by_kind.csv`): manufacturer impersonation 5 of 5, policy pressure 6 of 7, personal-data extraction 4 of 7, prompt injection 4 of 6, warranty fraud 1 of 6.
+- **Reading:** the model learns part of "is this an attack" from 31 examples: when it says attack it is almost always right, but at the plain cut-off it finds only about half of them (two thirds with the full conversation, which is where the later turns often carry the attack). Warranty fraud is nearly invisible to it. The extra answer costs nothing on request type except for full fine-tuning on the first message, where it lowered type accuracy (p = 0.02). Notebook 05 chooses the attack cut-off by F2 on the pool and scores option 1 by the team it sends handoffs to; it needs these runs on GitHub first.

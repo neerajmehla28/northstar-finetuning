@@ -1,0 +1,13 @@
+input,pair,same_reason
+first_message,jev vs haiku,0.739
+first_message,jev vs sonnet,0.725
+first_message,haiku vs sonnet,0.884
+first_message,jev: attacks called adversarial,0.677
+first_message,haiku: attacks called adversarial,0.871
+first_message,sonnet: attacks called adversarial,1.0
+full_conversation,jev vs haiku,0.536
+full_conversation,jev vs sonnet,0.464
+full_conversation,haiku vs sonnet,0.884
+full_conversation,jev: attacks called adversarial,0.194
+full_conversation,haiku: attacks called adversarial,0.839
+full_conversation,sonnet: attacks called adversarial,0.968

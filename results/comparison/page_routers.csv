@@ -1,0 +1,22 @@
+key,input,kind,router,type_right,type_range,english,french,language,caught,false_alarms,right_team,attacks_right,missed,extra_handoffs,handled_right,handled_range,p_vs_haiku,llm_share,usd_per_1000,seconds
+fm-haikuteamsrouter,first_message,Language model alone,Haiku (team's router),87.5,83–92,89.4,83.9,100.0,66,8,65,30,3,9,91.9,88–96,reference,100,0.328,2.34
+fm-sonnet,first_message,Language model alone,Sonnet,91.9,88–96,92.3,91.1,100.0,67,2,66,31,2,3,96.2,93–99,0.039,100,5.375,1.00
+fm-jev,first_message,Language model alone,Jev,85.6,81–90,90.4,76.8,100.0,68,12,60,24,1,22,80.6,73–87,0.002,100,0.074,0.20
+fm-finetunedfullalonereasonguessedfromtype,first_message,Fine-tuned alone,"Fine-tuned (full) alone, reason guessed from type",78.8,72–86,83.7,69.6,100.0,62,26,38,6,4,36,58.1,51–65,<0.001,0,0.0,0.25
+fm-finetunedfullhaikureason,first_message,Fine-tuned + language model for the reason,Fine-tuned (full) + Haiku reason,78.8,72–86,83.7,69.6,100.0,62,26,59,26,4,36,71.2,65–78,<0.001,55,0.185,0.25 + 2.34 on 55% of chats
+fm-finetunedfullhaikureasonhaikuwhenunsure,first_message,Fine-tuned + language model for the reason,Fine-tuned (full) + Haiku reason + Haiku when unsure,83.1,77–89,87.5,75.0,100.0,65,27,61,28,4,27,78.1,72–84,<0.001,63,0.212,0.25 + 2.34 on 63% of chats
+fm-finetunedfulljevreason,first_message,Fine-tuned + language model for the reason,Fine-tuned (full) + Jev reason,78.8,72–86,83.7,69.6,100.0,62,26,53,21,4,36,67.5,60–75,<0.001,55,0.041,0.25 + 0.20 on 55% of chats
+fm-finetunedfulljevreasonjevwhenunsure,first_message,Fine-tuned + language model for the reason,Fine-tuned (full) + Jev reason + Jev when unsure,81.9,75–88,86.5,73.2,100.0,65,28,55,23,4,29,73.1,66–80,<0.001,63,0.047,0.25 + 0.20 on 63% of chats
+fm-finetunedloraalonereasonguessedfromtype,first_message,Fine-tuned alone,"Fine-tuned (LoRA) alone, reason guessed from type",76.2,70–83,79.8,69.6,100.0,59,16,42,7,9,20,70.6,64–77,<0.001,0,0.0,0.25
+fm-finetunedlorahaikureason,first_message,Fine-tuned + language model for the reason,Fine-tuned (LoRA) + Haiku reason,76.2,70–83,79.8,69.6,100.0,59,16,58,22,9,20,80.6,75–87,<0.001,47,0.161,0.25 + 2.34 on 47% of chats
+fm-finetunedlorahaikureasonhaikuwhenunsure,first_message,Fine-tuned + language model for the reason,Fine-tuned (LoRA) + Haiku reason + Haiku when unsure,76.9,71–83,79.8,71.4,100.0,60,17,59,22,9,17,83.1,78–89,0.007,50,0.172,0.25 + 2.34 on 50% of chats
+fm-finetunedlorajevreason,first_message,Fine-tuned + language model for the reason,Fine-tuned (LoRA) + Jev reason,76.2,70–83,79.8,69.6,100.0,59,16,52,17,9,20,76.9,70–84,<0.001,47,0.035,0.25 + 0.20 on 47% of chats
+fm-finetunedlorajevreasonjevwhenunsure,first_message,Fine-tuned + language model for the reason,Fine-tuned (LoRA) + Jev reason + Jev when unsure,77.5,71–83,80.8,71.4,100.0,60,16,53,17,9,17,79.4,73–86,<0.001,50,0.037,0.25 + 0.20 on 50% of chats
+fc-haikuteamsrouter,full_conversation,Language model alone,Haiku (team's router),80.0,74–86,79.8,80.4,100.0,68,11,66,30,1,11,91.2,86–96,reference,100,0.372,2.34
+fc-sonnet,full_conversation,Language model alone,Sonnet,83.8,77–89,83.7,83.9,100.0,68,5,65,31,1,5,94.4,91–97,0.227,100,5.689,1.00
+fc-jev,full_conversation,Language model alone,Jev,80.6,75–86,81.7,78.6,100.0,64,7,41,10,4,18,71.2,65–78,<0.001,100,0.078,0.20
+fc-finetunedfullalonereasonguessedfromtype,full_conversation,Fine-tuned alone,"Fine-tuned (full) alone, reason guessed from type",77.5,70–85,81.7,69.6,100.0,64,23,37,6,3,34,58.8,52–66,<0.001,0,0.0,0.25
+fc-finetunedfullhaikureason,full_conversation,Fine-tuned + language model for the reason,Fine-tuned (full) + Haiku reason,77.5,70–85,81.7,69.6,100.0,64,23,60,27,3,34,73.1,66–80,<0.001,54,0.208,0.25 + 2.34 on 54% of chats
+fc-finetunedfullhaikureasonhaikuwhenunsure,full_conversation,Fine-tuned + language model for the reason,Fine-tuned (full) + Haiku reason + Haiku when unsure,81.9,75–88,86.5,73.2,100.0,66,25,61,28,3,25,79.4,74–85,<0.001,62,0.24,0.25 + 2.34 on 62% of chats
+fc-finetunedfulljevreason,full_conversation,Fine-tuned + language model for the reason,Fine-tuned (full) + Jev reason,77.5,70–85,81.7,69.6,100.0,64,23,43,10,3,34,62.5,55–69,<0.001,54,0.042,0.25 + 0.20 on 54% of chats
+fc-finetunedfulljevreasonjevwhenunsure,full_conversation,Fine-tuned + language model for the reason,Fine-tuned (full) + Jev reason + Jev when unsure,81.2,75–88,84.6,75.0,100.0,66,25,45,11,3,26,68.8,63–75,<0.001,62,0.049,0.25 + 0.20 on 62% of chats

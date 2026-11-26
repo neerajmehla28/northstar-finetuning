@@ -1,0 +1,20 @@
+input,option,tuned_model,language_model,only_option_right,only_haiku_right,p_value
+first_message,3 language model alone,-,jev,7,25,0.0021
+first_message,3 language model alone,-,sonnet,8,1,0.0391
+first_message,"1a tuned, reason from type (her rule)",full fine-tuning,-,4,58,0.0
+first_message,2 tuned + reason step,full fine-tuning,jev,4,43,0.0
+first_message,2c tuned + reason step + cascade,full fine-tuning,jev,5,35,0.0
+first_message,2 tuned + reason step,full fine-tuning,haiku,4,37,0.0
+first_message,2c tuned + reason step + cascade,full fine-tuning,haiku,4,26,0.0001
+first_message,"1a tuned, reason from type (her rule)",LoRA 60 epochs,-,5,39,0.0
+first_message,2 tuned + reason step,LoRA 60 epochs,jev,5,29,0.0
+first_message,2c tuned + reason step + cascade,LoRA 60 epochs,jev,6,26,0.0005
+first_message,2 tuned + reason step,LoRA 60 epochs,haiku,5,23,0.0009
+first_message,2c tuned + reason step + cascade,LoRA 60 epochs,haiku,5,19,0.0066
+full_conversation,3 language model alone,-,jev,6,38,0.0
+full_conversation,3 language model alone,-,sonnet,8,3,0.2266
+full_conversation,"1a tuned, reason from type (her rule)",full fine-tuning,-,3,55,0.0
+full_conversation,2 tuned + reason step,full fine-tuning,jev,3,49,0.0
+full_conversation,2c tuned + reason step + cascade,full fine-tuning,jev,5,41,0.0
+full_conversation,2 tuned + reason step,full fine-tuning,haiku,3,32,0.0
+full_conversation,2c tuned + reason step + cascade,full fine-tuning,haiku,3,22,0.0002

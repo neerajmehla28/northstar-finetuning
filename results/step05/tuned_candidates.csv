@@ -1,0 +1,4 @@
+model,input,epoch,esc_cutoff_probability,type_macro_f1_mean,type_macro_f1_sd,esc_f2_default_mean,esc_f2_cutoff_mean,esc_f2_cutoff_sd,combined_esc_recall,combined_missed,combined_false_alarms
+full fine-tuning,first_message,27,0.05,0.722,0.043,0.739,0.842,0.019,0.899,7,26
+full fine-tuning,full_conversation,29,0.05,0.747,0.036,0.779,0.854,0.023,0.928,5,23
+LoRA 60 epochs,first_message,60,0.1,0.723,0.029,0.796,0.847,0.005,0.855,10,16
